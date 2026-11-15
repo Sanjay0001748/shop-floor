@@ -1,0 +1,1387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shop Floor Electrics</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout idea: a control-panel legend. Lesson rail on the left, one lesson "panel" on the right;
+   R-Y-B phase colours are reserved for three-phase content, cobalt is the only accent. */
+:root{
+  --bg:#eceff3; --surface:#ffffff; --sunk:#f4f6f9; --ink:#15202b; --muted:#566473; --line:#d2d9e1;
+  --accent:#1d4fd7; --accent-ink:#ffffff; --accent-soft:#e3ebff;
+  --good:#15803d; --good-soft:#dcf5e4; --bad:#c0362c; --bad-soft:#fbe3e0; --warn:#a16207; --warn-soft:#fbf0cf;
+  --ph-r:#d43d3d; --ph-y:#d39b00; --ph-b:#2f6fe0;
+  --display:"Barlow Condensed","Arial Narrow",Arial,sans-serif;
+  --body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#0f151c; --surface:#18212b; --sunk:#121a23; --ink:#e6ebf1; --muted:#98a5b4; --line:#2b3745;
+    --accent:#86a8ff; --accent-ink:#0c1320; --accent-soft:#1d2b4a;
+    --good:#5fd08a; --good-soft:#15301f; --bad:#ff8a7e; --bad-soft:#3a1a17; --warn:#f0c14b; --warn-soft:#3a2f10;
+    --ph-r:#ff6b6b; --ph-y:#f2c230; --ph-b:#6ea2ff;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0f151c; --surface:#18212b; --sunk:#121a23; --ink:#e6ebf1; --muted:#98a5b4; --line:#2b3745;
+  --accent:#86a8ff; --accent-ink:#0c1320; --accent-soft:#1d2b4a;
+  --good:#5fd08a; --good-soft:#15301f; --bad:#ff8a7e; --bad-soft:#3a1a17; --warn:#f0c14b; --warn-soft:#3a2f10;
+  --ph-r:#ff6b6b; --ph-y:#f2c230; --ph-b:#6ea2ff;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.55}
+h1,h2,h3{font-family:var(--display);line-height:1.1;margin:0;text-wrap:balance;letter-spacing:.01em}
+p{margin:0}
+a{color:var(--accent)}
+button,select,input{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.wrap{max-width:1180px;margin:0 auto;padding:20px 16px 48px;display:flex;flex-direction:column;gap:18px}
+
+/* header */
+.top{display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;justify-content:space-between}
+.brand h1{font-size:40px;font-weight:700;text-transform:uppercase}
+.brand p{color:var(--muted);font-size:14px}
+.phase{display:inline-flex;gap:4px;margin-right:10px;vertical-align:middle}
+.phase i{width:10px;height:28px;border-radius:2px;display:block}
+.phase i:nth-child(1){background:var(--ph-r)}.phase i:nth-child(2){background:var(--ph-y)}.phase i:nth-child(3){background:var(--ph-b)}
+.meter{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:10px 14px;min-width:260px;display:flex;flex-direction:column;gap:6px}
+.meter-row{display:flex;justify-content:space-between;gap:12px;font-size:13px;color:var(--muted)}
+.meter-row b{color:var(--ink);font-family:var(--mono);font-weight:600;font-variant-numeric:tabular-nums}
+.bar{height:8px;background:var(--sunk);border:1px solid var(--line);border-radius:99px;overflow:hidden}
+.bar span{display:block;height:100%;background:var(--accent);width:0;transition:width .3s}
+
+/* layout */
+.grid{display:grid;grid-template-columns:270px minmax(0,1fr);gap:18px;align-items:start}
+nav.rail{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px;position:sticky;top:12px;max-height:calc(100vh - 24px);overflow:auto}
+.rail h3{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);padding:10px 8px 4px;font-weight:600}
+.rail a{display:flex;gap:8px;align-items:center;padding:7px 8px;border-radius:7px;text-decoration:none;color:var(--ink);font-size:14.5px}
+.rail a:hover{background:var(--sunk)}
+.rail a.on{background:var(--accent-soft);color:var(--ink);font-weight:600}
+.dot{width:16px;height:16px;border-radius:50%;border:2px solid var(--line);flex:none;display:grid;place-items:center;font-size:10px;line-height:1}
+.done .dot{background:var(--good);border-color:var(--good);color:var(--surface)}
+.done .dot::after{content:"✓";font-weight:700}
+.jump{display:none}
+.jump select{width:100%;padding:10px;border-radius:8px;border:1px solid var(--line);background:var(--surface)}
+
+main{display:flex;flex-direction:column;gap:16px;min-width:0}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px;display:flex;flex-direction:column;gap:12px}
+.eyebrow{font-family:var(--mono);font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.lesson-title{font-size:38px;font-weight:700}
+.oneline{font-size:19px;font-weight:500;max-width:60ch}
+.card h2{font-size:24px;font-weight:600}
+.prose{display:flex;flex-direction:column;gap:10px;max-width:68ch}
+.formula{font-family:var(--mono);background:var(--sunk);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:6px;padding:10px 12px;font-size:15px;overflow-x:auto}
+.plant{background:var(--warn-soft);border:1px solid var(--line);border-radius:8px;padding:12px 14px;max-width:68ch}
+.plant b{font-family:var(--display);font-size:17px;letter-spacing:.03em;text-transform:uppercase;display:block;margin-bottom:2px}
+
+/* widget */
+.lab{background:var(--sunk);border:1px dashed var(--line);border-radius:10px;padding:16px;display:flex;flex-direction:column;gap:14px}
+.ctrls{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}
+.ctrl{display:flex;flex-direction:column;gap:4px;font-size:14px}
+.ctrl label{display:flex;justify-content:space-between;gap:8px;color:var(--muted)}
+.ctrl label b{font-family:var(--mono);color:var(--ink);font-variant-numeric:tabular-nums}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.ctrl select,.ctrl input[type=number]{padding:8px;border-radius:7px;border:1px solid var(--line);background:var(--surface)}
+.outs{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.out{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.out small{display:block;color:var(--muted);font-size:12.5px}
+.out b{font-family:var(--mono);font-size:22px;font-weight:600;font-variant-numeric:tabular-nums}
+.pill{display:inline-block;padding:3px 10px;border-radius:99px;font-size:13px;font-weight:600}
+.pill.good{background:var(--good-soft);color:var(--good)}.pill.bad{background:var(--bad-soft);color:var(--bad)}.pill.warn{background:var(--warn-soft);color:var(--warn)}
+.hbar{height:16px;background:var(--surface);border:1px solid var(--line);border-radius:4px;overflow:hidden}
+.hbar span{display:block;height:100%;background:var(--accent);transition:width .15s}
+.hbar.r span{background:var(--bad)}.hbar.g span{background:var(--good)}
+.rowlab{display:flex;justify-content:space-between;font-size:13.5px;color:var(--muted)}
+.rowlab b{font-family:var(--mono);color:var(--ink)}
+canvas{width:100%;height:170px;background:var(--surface);border:1px solid var(--line);border-radius:8px;display:block}
+.btns{display:flex;flex-wrap:wrap;gap:8px}
+.btn{padding:9px 14px;border-radius:8px;border:1px solid var(--line);background:var(--surface);cursor:pointer;font-weight:500}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent)}
+.btn.go{background:var(--good);color:var(--surface);border-color:var(--good)}
+.btn.stop{background:var(--bad);color:var(--surface);border-color:var(--bad)}
+.btn[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent)}
+.rung{font-family:var(--mono);font-size:14px;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px;overflow-x:auto;white-space:nowrap}
+.rung span{padding:3px 6px;border-radius:4px;border:1px solid var(--line);color:var(--muted)}
+.rung span.live{background:var(--good-soft);color:var(--good);border-color:var(--good);font-weight:600}
+.rotor{width:74px;height:74px;border-radius:50%;border:5px solid var(--muted);border-top-color:var(--accent);animation:spin 1s linear infinite;flex:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+.steps{display:flex;flex-direction:column;gap:8px}
+.steps button{text-align:left}
+.steps button.ok{background:var(--good-soft);border-color:var(--good)}
+.steps button.no{background:var(--bad-soft);border-color:var(--bad)}
+.note{font-size:13.5px;color:var(--muted)}
+
+/* video */
+.videos{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px}
+.video{display:flex;gap:12px;align-items:center;text-decoration:none;color:var(--ink);background:var(--sunk);border:1px solid var(--line);border-radius:10px;padding:12px}
+.video:hover{border-color:var(--accent)}
+.play{width:46px;height:46px;border-radius:10px;background:var(--bad);flex:none;display:grid;place-items:center}
+.play::after{content:"";border-left:14px solid #fff;border-top:9px solid transparent;border-bottom:9px solid transparent;margin-left:3px}
+.video b{display:block;line-height:1.3}
+.video small{color:var(--muted)}
+
+/* quiz */
+.q{display:flex;flex-direction:column;gap:8px;padding-top:6px}
+.q p{font-weight:600;max-width:64ch}
+.opts{display:grid;gap:8px}
+.opt{text-align:left;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:var(--sunk);cursor:pointer}
+.opt:hover:not(:disabled){border-color:var(--accent)}
+.opt.right{background:var(--good-soft);border-color:var(--good)}
+.opt.wrong{background:var(--bad-soft);border-color:var(--bad)}
+.opt:disabled{cursor:default}
+.why{font-size:14.5px;color:var(--muted);max-width:64ch}
+.foot{display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between;align-items:center}
+
+.check{display:flex;gap:10px;align-items:flex-start;max-width:68ch;cursor:pointer}
+.check input{width:18px;height:18px;margin:3px 0 0;accent-color:var(--accent);flex:none}
+.opt.right,.opt.wrong{opacity:1}
+textarea{width:100%;max-width:68ch;padding:10px;border-radius:8px;border:1px solid var(--line);background:var(--sunk);font:inherit;color:inherit;resize:vertical}
+.gl{margin:0;display:flex;flex-direction:column}
+.gl div{display:grid;grid-template-columns:150px minmax(0,1fr);gap:12px;padding:10px 0;border-top:1px solid var(--line)}
+.gl dt{font-family:var(--mono);font-weight:600}.gl dd{margin:0}
+@media (max-width:520px){.gl div{grid-template-columns:1fr;gap:2px}}
+/* start page */
+.mods{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+.mod{border:1px solid var(--line);border-radius:10px;padding:14px;background:var(--sunk);display:flex;flex-direction:column;gap:6px}
+.mod h3{font-size:20px}
+.mod a{font-size:14.5px;text-decoration:none}
+.mod a:hover{text-decoration:underline}
+.tips{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px;max-width:68ch}
+
+@media (max-width:820px){
+  .grid{grid-template-columns:1fr}
+  nav.rail{display:none}
+  .jump{display:block}
+  .brand h1{font-size:32px}.lesson-title{font-size:30px}
+  .meter{width:100%}
+}
+@media (prefers-reduced-motion:reduce){.rotor{animation:none}.bar span,.hbar span{transition:none}}
+
+/* ---- Field notebook skin: graph paper by day, chalkboard by night.
+   Handwriting marks the learner's side of the page (labels, sticky notes); print type carries the teaching. ---- */
+:root{
+  --bg:#f1f4ef; --surface:#fcfdfb; --sunk:#eef1eb; --ink:#1c2733; --muted:#55616d; --line:#c7d0d3;
+  --accent:#1f5fbf; --accent-ink:#ffffff; --accent-soft:#dfeaf9;
+  --good:#1f7a45; --good-soft:#dcf0e2; --bad:#c23b2f; --bad-soft:#f9e1dd; --warn:#8a6500; --warn-soft:#fff3b8;
+  --hl:#ffe45c; --note:#fff2ad; --grid:rgba(31,95,191,.07);
+  --display:"Bricolage Grotesque","Trebuchet MS",system-ui,sans-serif;
+  --hand:"Caveat","Segoe Print","Bradley Hand",cursive;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#1a2521; --surface:#22302b; --sunk:#18221e; --ink:#eef1ea; --muted:#a6b3ab; --line:#3b4b44;
+    --accent:#9cc4ff; --accent-ink:#0f1a16; --accent-soft:#273b4c;
+    --good:#7fd69c; --good-soft:#1e3a2a; --bad:#ff9a8d; --bad-soft:#42211d; --warn:#f2cf5b; --warn-soft:#3d3515;
+    --hl:rgba(242,207,91,.3); --note:#4a4118; --grid:rgba(255,255,255,.045);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#1a2521; --surface:#22302b; --sunk:#18221e; --ink:#eef1ea; --muted:#a6b3ab; --line:#3b4b44;
+  --accent:#9cc4ff; --accent-ink:#0f1a16; --accent-soft:#273b4c;
+  --good:#7fd69c; --good-soft:#1e3a2a; --bad:#ff9a8d; --bad-soft:#42211d; --warn:#f2cf5b; --warn-soft:#3d3515;
+  --hl:rgba(242,207,91,.3); --note:#4a4118; --grid:rgba(255,255,255,.045);
+}
+body{background-color:var(--bg);background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:24px 24px}
+h1,h2,h3{letter-spacing:-.01em}
+.brand h1{text-transform:none;font-size:38px}
+.lesson-title{font-size:36px}
+.card{position:relative;border-radius:14px 18px 14px 20px;box-shadow:2px 3px 0 rgba(0,0,0,.05)}
+.card h2:not(.lesson-title){font-family:var(--hand);font-size:32px;font-weight:700;color:var(--accent);line-height:1}
+.eyebrow{font-family:var(--hand);font-size:21px;text-transform:none;letter-spacing:0}
+.oneline{width:fit-content;line-height:1.5;background-image:linear-gradient(transparent 58%,var(--hl) 58%,var(--hl) 90%,transparent 90%);background-size:100% 1.5em}
+.plant{background:var(--note);border-color:transparent;border-radius:3px 3px 16px 3px;transform:rotate(-.4deg);box-shadow:2px 4px 0 rgba(0,0,0,.08)}
+.plant b{font-family:var(--hand);font-size:25px;text-transform:none;letter-spacing:0;line-height:1.1}
+.formula{border:1.5px solid var(--ink);border-radius:4px;box-shadow:3px 3px 0 var(--accent-soft)}
+.lab{border:2px dashed var(--line);border-radius:18px 12px 20px 12px}
+.btn,.opt{border-width:1.5px;border-radius:10px 13px 10px 14px;transition:transform .08s}
+.btn:active,.opt:active:not(:disabled){transform:translateY(1px) scale(.99)}
+.rail h3{font-family:var(--hand);font-size:20px;text-transform:none;letter-spacing:0}
+.meter,nav.rail{border-radius:12px 16px 12px 18px;box-shadow:2px 3px 0 rgba(0,0,0,.05)}
+.stamp{position:absolute;top:18px;right:18px;font-family:var(--display);font-weight:700;font-size:20px;letter-spacing:.14em;text-transform:uppercase;color:var(--good);border:3px solid var(--good);border-radius:6px;padding:1px 12px;transform:rotate(-9deg);opacity:.85;animation:stamp .35s ease-out}
+.stamp[hidden]{display:none}
+@keyframes stamp{from{transform:rotate(-9deg) scale(2.2);opacity:0}}
+canvas.tall{height:210px}
+canvas.drag{cursor:grab;touch-action:none}
+canvas.drag:active{cursor:grabbing}
+@media (max-width:820px){.stamp{position:static;align-self:flex-start;transform:rotate(-4deg)}.brand h1{font-size:30px}.lesson-title{font-size:29px}}
+@media (prefers-reduced-motion:reduce){.stamp{animation:none}.btn,.opt{transition:none}}
+
+/* circuit diagrams and deeper explanations */
+figure{margin:0;display:flex;flex-direction:column;gap:8px;overflow-x:auto}
+figcaption{font-family:var(--hand);font-size:22px;color:var(--muted);line-height:1.1}
+.ckt{width:100%;max-width:560px;min-width:300px;height:auto;display:block}
+.ckt .w{stroke:var(--ink);stroke-width:2;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.ckt .f{fill:var(--surface)}
+.ckt .thick{stroke-width:4}.ckt .thin{stroke-width:1.3}.ckt .dash{stroke-dasharray:5 5}
+.ckt .acc{stroke:var(--accent)}.ckt .live{stroke:var(--good)}.ckt .bad{stroke:var(--bad)}
+.ckt .r{stroke:var(--ph-r)}.ckt .y{stroke:var(--ph-y)}.ckt .b{stroke:var(--ph-b)}
+.ckt .d{fill:var(--ink)}
+.ckt text{fill:var(--ink);font:500 12.5px var(--body)}
+.ckt text.m{fill:var(--muted);font-weight:400}.ckt text.bold{font-weight:600;font-size:14px}.ckt text.sm{font-size:10px}
+.legend{display:grid;grid-template-columns:repeat(auto-fill,minmax(108px,1fr));gap:8px}
+.legend div{border:1px solid var(--line);border-radius:8px;padding:6px;text-align:center;font-size:13px;background:var(--surface)}
+.legend .ckt{width:72px;min-width:0;height:58px;margin:0 auto}
+.ex,.miss{border-radius:8px;padding:12px 14px;max-width:68ch}
+.ex{background:var(--accent-soft)}.miss{background:var(--bad-soft)}
+.ex b,.miss b{display:block;font-family:var(--hand);font-size:23px;line-height:1.1;margin-bottom:2px}
+
+/* ---- Minimal black: one theme by choice. Black page, hairline borders, white as the only accent.
+   Colour is kept for meaning only: good, bad, warning and the R-Y-B phases. ---- */
+:root:root:root{
+  color-scheme:dark;
+  --bg:#000000; --surface:#0a0a0a; --sunk:#111111; --ink:#f2f2f2; --muted:#8f8f8f; --line:#262626;
+  --accent:#ffffff; --accent-ink:#000000; --accent-soft:#1c1c1c;
+  --good:#4ade80; --good-soft:#0e2216; --bad:#f87171; --bad-soft:#2a1111; --warn:#facc15; --warn-soft:#262008;
+  --ph-r:#ff5a5a; --ph-y:#f5c518; --ph-b:#5b9dff;
+  --hl:transparent; --note:#111111; --grid:transparent;
+  --display:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --body:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"Geist Mono",ui-monospace,Menlo,Consolas,monospace;
+  --hand:var(--body);
+}
+body{background:var(--bg);background-image:none}
+a{color:var(--ink)}
+.brand h1{font-size:26px;font-weight:600;letter-spacing:-.02em}
+.phase i{width:4px;height:20px;border-radius:1px}
+.lesson-title{font-size:30px;font-weight:600;letter-spacing:-.02em}
+.card,.meter,nav.rail{border-radius:12px;box-shadow:none}
+.card{padding:24px;gap:14px}
+.card h2:not(.lesson-title),.rail h3,.plant b,.ex b,.miss b{font-family:var(--body);font-size:12px;font-weight:500;letter-spacing:.09em;text-transform:uppercase;color:var(--muted);line-height:1.4}
+.eyebrow{font-family:var(--mono);font-size:12px;text-transform:uppercase;letter-spacing:.06em}
+.oneline{background-image:none;font-size:20px;font-weight:400;color:var(--ink)}
+.prose,.tips{color:#cfcfcf}
+.plant{background:transparent;transform:none;box-shadow:none;border:0;border-left:1px solid var(--ink);border-radius:0;padding:2px 0 2px 16px}
+.formula{border:1px solid var(--line);box-shadow:none;border-radius:8px;background:var(--bg)}
+.lab{border:1px solid var(--line);border-radius:12px;background:var(--bg)}
+.btn,.opt{border-width:1px;border-radius:8px}
+.btn:hover,.opt:hover:not(:disabled),.video:hover{border-color:var(--muted)}
+.btn.go,.btn.stop{color:#000}
+.rail a.on{background:var(--accent-soft)}
+.ex,.miss{background:transparent;border:1px solid var(--line);border-radius:8px}
+.miss{border-left:1px solid var(--bad)}
+figcaption{font-family:var(--body);font-size:13px}
+.video{background:transparent}
+.play{background:var(--ink);border-radius:8px}
+.play::after{border-left-color:#000}
+.stamp{transform:none;animation:none;font-family:var(--mono);font-size:11px;font-weight:500;letter-spacing:.1em;border-width:1px;border-radius:99px;padding:2px 10px;opacity:1}
+.mod,.out,.legend div{background:transparent}
+canvas{background:var(--bg)}
+.ckt .f{fill:var(--surface)}
+textarea,.jump select,.ctrl select,.ctrl input[type=number]{background:var(--bg)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <h1><span class="phase" aria-hidden="true"><i></i><i></i><i></i></span>Shop Floor Electrics</h1>
+      <p>Electrical engineering from zero for a Graduate Engineer Trainee at a tyre plant.</p>
+    </div>
+    <div class="meter" aria-live="polite">
+      <div class="meter-row"><span id="rank">New joiner</span><b id="xp">0 XP</b></div>
+      <div class="bar"><span id="pbar"></span></div>
+      <div class="meter-row"><span>Lessons done</span><b id="pcount">0 / 33</b></div>
+    </div>
+  </header>
+
+  <div class="jump"><label for="jumpsel" class="note">Go to lesson</label><select id="jumpsel"></select></div>
+
+  <div class="grid">
+    <nav class="rail" id="rail" aria-label="Lessons"></nav>
+    <main id="main"></main>
+  </div>
+</div>
+
+<script>
+const MODS=["Before you touch anything","Start from zero","The AC world","Machines and drives","Plant power system","Control and automation","Tools, upkeep and practice"];
+const TGT=(()=>{try{return window.self===window.top;}catch(_){return false;}})()?' target="_blank"':"";
+const yt=id=>"https://www.youtube.com/watch?v="+id;
+const yts=q=>"https://www.youtube.com/results?search_query="+encodeURIComponent(q);
+
+let L=[
+{id:"safety-loto",m:0,t:"Safety and lockout-tagout",
+ one:"Electricity gives no warning. Isolate, lock, test, and only then touch.",
+ body:[
+  "You cannot see, hear or smell voltage. A dead panel and a live panel look exactly the same. So engineers never trust a switch position or someone's word. They prove it.",
+  "Lockout-tagout (LOTO) is the routine that makes a machine safe to work on. You switch off the isolator, put <b>your own padlock</b> on it, hang a tag with your name, and keep the key in your pocket. Nobody can switch it on while you are inside.",
+  "Switching off is only half the job. Machines store energy: compressed air, steam, hydraulic pressure, charged capacitors, a heavy drum still spinning. Release it, then test that the machine really is dead."],
+ formula:"Stop → Isolate → Lock and tag → Release stored energy → Test for dead → Work",
+ plant:"A curing press holds steam, hot water, hydraulic and pneumatic pressure long after its power is off. A mixer or calender carries huge rotating inertia. Ask for the plant's LOTO procedure on day one and follow it exactly.",
+ w:"loto",
+ v:[{t:"Lockout Tagout Training Video",c:"YouTube",u:yt("Np14M0du758")}],
+ quiz:[
+  {q:"A colleague says the panel is switched off. What do you do before touching a terminal?",o:["Trust them, they are senior","Check the switch handle is at OFF","Isolate, lock, and test with a meter yourself"],a:2,y:"Only a test with a working meter proves a circuit is dead. Your lock makes sure it stays that way."},
+  {q:"Why does each person fit their own padlock?",o:["So nobody can re-energise while that person is still working","To show who is the supervisor","Because one lock can break"],a:0,y:"The machine can only be switched on when every lock is removed, so every person is protected."}]},
+
+{id:"voltage-current-resistance",m:1,t:"Voltage, current and resistance",
+ one:"Voltage pushes, current flows, resistance holds back.",
+ body:[
+  "Think of water in a pipe. <b>Voltage</b> (volts, V) is the pressure from the pump. <b>Current</b> (amps, A) is how much water flows each second. <b>Resistance</b> (ohms, Ω) is how narrow the pipe is.",
+  "More pressure pushes more water. A narrower pipe lets less through. Ohm's law says exactly that with numbers.",
+  "Current is what heats cables and trips breakers, so it is the number you will check most often on the shop floor."],
+ formula:"V = I × R      I = V ÷ R      R = V ÷ I",
+ plant:"Motor nameplates, cable sizes and breaker ratings are all written in amps. A clamp meter reading higher than the nameplate current means the motor is overloaded.",
+ w:"ohm",
+ v:[{t:"Ohms Law Explained - The basics circuit theory",c:"The Engineering Mindset",u:yt("HsLLq6Rm5tU")}],
+ quiz:[
+  {q:"A 24 V supply feeds a 12 Ω resistor. What current flows?",o:["0.5 A","2 A","288 A"],a:1,y:"I = V ÷ R = 24 ÷ 12 = 2 A."},
+  {q:"Voltage stays the same and resistance doubles. Current will…",o:["double","stay the same","halve"],a:2,y:"Current is inversely proportional to resistance."}]},
+
+{id:"power-and-energy",m:1,t:"Power and energy",
+ one:"Power is how fast you use electricity. Energy is how much you used in total.",
+ body:[
+  "<b>Power</b> is measured in watts (W) or kilowatts (kW). A 75 kW motor needs 75 kW while it runs at full load.",
+  "<b>Energy</b> is power multiplied by time, measured in kilowatt-hours (kWh). One kWh is one \"unit\" on the electricity bill.",
+  "Power is like the speed of a car and energy is the distance covered. A plant pays for distance, so running hours matter as much as motor size."],
+ formula:"P = V × I  (DC)      Energy (kWh) = Power (kW) × Time (h)",
+ plant:"Energy is one of the biggest running costs in tyre making. Mixing, curing and compressed air are the heavy users, which is why plants track kWh per tonne of rubber.",
+ w:"energy",
+ v:[{t:"What is a kWh?",c:"The Engineering Mindset",u:yt("SMPhh8gT_1E")}],
+ quiz:[
+  {q:"A 10 kW heater runs for 3 hours. Energy used?",o:["3.3 kWh","13 kWh","30 kWh"],a:2,y:"10 kW × 3 h = 30 kWh, or 30 units."},
+  {q:"Which is a unit of energy?",o:["kW","kWh","kVA"],a:1,y:"kW is a rate. kWh is the total amount."}]},
+
+{id:"ac-and-dc",m:1,t:"AC and DC",
+ one:"DC flows one way. AC swings back and forth 50 times a second.",
+ body:[
+  "<b>Direct current</b> flows steadily in one direction, like water in a river. Batteries, PLC electronics and sensors use DC, usually 24 V.",
+  "<b>Alternating current</b> reverses direction again and again, like a saw blade. In India it completes 50 cycles each second, so the frequency is 50 Hz.",
+  "The grid uses AC because transformers can raise and lower AC voltage easily, and high voltage carries power over long distances with little loss."],
+ formula:"India: 230 V single-phase, 415 V three-phase, 50 Hz",
+ plant:"Inside one control panel you will see both: 415 V AC for the motors and 24 V DC for the PLC, sensors and indicator lamps. Always check which one you are measuring.",
+ w:"wave",
+ v:[{t:"AC and DC explained",c:"YouTube",u:yts("difference between AC and DC explained animation"),s:1}],
+ quiz:[
+  {q:"What does 50 Hz mean?",o:["50 volts","50 complete cycles every second","50 amps"],a:1,y:"Hertz counts cycles per second."},
+  {q:"A PLC input card and its sensors usually run on…",o:["24 V DC","415 V AC","11 kV AC"],a:0,y:"Low-voltage DC is safe and stable for control electronics."}]},
+
+{id:"three-phase",m:1,t:"Three-phase power",
+ one:"Three AC supplies, each a third of a cycle apart, sharing the work.",
+ body:[
+  "Industry uses three live wires instead of one. They are called R, Y and B (red, yellow, blue). Each carries the same AC wave, shifted by 120°.",
+  "Because the three waves peak one after another, the total power never drops to zero. Motors get a smooth push that rotates, so three-phase motors start by themselves.",
+  "Between any two phases you measure the <b>line voltage</b>, 415 V. Between one phase and neutral you measure the <b>phase voltage</b>, about 240 V."],
+ formula:"V(line) = √3 × V(phase)      P = √3 × V(line) × I × PF",
+ plant:"Every busbar and cable in the plant is colour-marked R, Y, B. If two phases are swapped at a motor, it runs backwards. That is the first thing to check after any motor is reconnected.",
+ w:"three",
+ v:[{t:"How Three Phase Electricity works - The basics explained",c:"The Engineering Mindset",u:yt("4oRT7PoXSS0")}],
+ quiz:[
+  {q:"The three phases are separated by…",o:["90°","120°","180°"],a:1,y:"360° ÷ 3 = 120°."},
+  {q:"A three-phase motor runs in the wrong direction. The quick fix is to…",o:["swap any two phase wires","swap all three wires round","reduce the voltage"],a:0,y:"Swapping any two phases reverses the rotating magnetic field."}]},
+
+{id:"power-factor",m:1,t:"Power factor",
+ one:"How much of the current you draw is doing real work.",
+ body:[
+  "Picture a glass of beer. The liquid is <b>real power</b> (kW), the part that does work. The foam is <b>reactive power</b> (kVAr), which motors need for magnetism but which does no work. The whole glass is <b>apparent power</b> (kVA), what the supply has to deliver.",
+  "Power factor is liquid divided by glass. At 1.0 there is no foam. At 0.7 nearly a third of the glass is wasted space.",
+  "Low power factor means more current for the same work: hotter cables, bigger transformers, and a penalty on the bill. Capacitor banks supply the foam locally and bring the power factor back up."],
+ formula:"PF = kW ÷ kVA      kVA² = kW² + kVAr²",
+ plant:"Look for the APFC panel (automatic power factor correction) near the main LT panel. It switches capacitor steps in and out as the motor load changes. Plants aim to keep power factor close to 1.",
+ w:"pf",
+ v:[{t:"Power Factor Explained - The basics what is power factor pf",c:"The Engineering Mindset",u:yt("Tv_7XWf96gg")}],
+ quiz:[
+  {q:"A load takes 80 kW and 100 kVA. Power factor?",o:["0.8","1.25","0.2"],a:0,y:"PF = kW ÷ kVA = 80 ÷ 100."},
+  {q:"What do plants install to improve a lagging power factor?",o:["More motors","Capacitor banks","Bigger fuses"],a:1,y:"Capacitors supply reactive power close to the load."}]},
+
+{id:"transformers",m:2,t:"Transformers",
+ one:"A transformer trades voltage for current using two coils and a shared iron core.",
+ body:[
+  "AC in the first coil makes a changing magnetic field in the iron core. That field induces a voltage in the second coil. Nothing moves and the coils never touch.",
+  "The voltage ratio equals the turns ratio. Fewer turns on the output side gives a lower voltage and a proportionally higher current. Power in is almost equal to power out.",
+  "Transformers only work on AC. A steady DC makes a steady field, and a steady field induces nothing."],
+ formula:"Vs ÷ Vp = Ns ÷ Np      Vp × Ip ≈ Vs × Is",
+ plant:"Power usually arrives at a large plant at 33 kV or 11 kV. Transformers in the substation step it down to 433 V for the shop floor. Small control transformers inside panels step it down again for control circuits.",
+ w:"xfmr",
+ v:[{t:"How does a Transformer work - Working Principle electrical engineering",c:"The Engineering Mindset",u:yt("UchitHGF4n8")}],
+ quiz:[
+  {q:"A transformer has 1000 primary turns and 100 secondary turns. 11 kV goes in. What comes out?",o:["110 kV","1.1 kV","11 kV"],a:1,y:"The ratio is 10:1, so 11 000 ÷ 10 = 1100 V."},
+  {q:"Why can't a transformer work on steady DC?",o:["DC is too weak","The magnetic field must keep changing to induce a voltage","DC damages copper"],a:1,y:"Induction needs a changing magnetic field."}]},
+
+{id:"induction-motors",m:2,t:"Induction motors",
+ one:"A rotating magnetic field drags a metal rotor round with it.",
+ body:[
+  "Three-phase current in the stator windings creates a magnetic field that spins round the inside of the motor. Its speed is the <b>synchronous speed</b>.",
+  "The spinning field induces currents in the bars of the rotor (the \"squirrel cage\"). Those currents make their own magnetism, and the rotor is pulled along.",
+  "The rotor always runs slightly slower than the field. That small gap is called <b>slip</b>, and without it nothing would be induced. A 4-pole motor on 50 Hz has a field speed of 1500 rpm and runs at about 1450 to 1480 rpm."],
+ formula:"Ns = 120 × f ÷ P      N = Ns × (1 − slip)",
+ plant:"Almost everything that moves is driven by an induction motor: mixers, mills, extruders, calenders, conveyors, pumps, fans and compressors. Learn to read a nameplate: kW, volts, amps, rpm, power factor, connection.",
+ w:"motor",
+ v:[{t:"How Electric Motors Work - 3 phase AC induction motors",c:"The Engineering Mindset",u:yt("59HBoIXzX_c")}],
+ quiz:[
+  {q:"Synchronous speed of a 6-pole motor on 50 Hz?",o:["3000 rpm","1500 rpm","1000 rpm"],a:2,y:"120 × 50 ÷ 6 = 1000 rpm."},
+  {q:"Why does the rotor turn slower than the magnetic field?",o:["Friction only","Slip is needed for current to be induced in the rotor","The supply is weak"],a:1,y:"If the rotor matched the field speed, no current would be induced and there would be no torque."}]},
+
+{id:"motor-starters",m:2,t:"Motor starters",
+ one:"A motor at standstill pulls a huge current. Starters tame it.",
+ body:[
+  "Switch a motor straight onto the supply and it draws about 6 to 8 times its normal current for a few seconds. This is a <b>DOL</b> (direct-on-line) start. Fine for small motors, rough on the supply for big ones.",
+  "A <b>star-delta</b> starter connects the windings in star first, so each winding sees a lower voltage. Starting current and torque both drop to about one third. After a few seconds a timer switches to delta for full power.",
+  "<b>Soft starters</b> ramp the voltage up electronically, and <b>VFDs</b> (next lesson) ramp the frequency. Both give a smooth start."],
+ formula:"DOL start ≈ 6 to 8 × FLC      Star-delta start ≈ ⅓ of DOL",
+ plant:"Open a starter panel (with permission) and you will find three contactors and a timer for star-delta: Main, Star and Delta. Listen during a start: you can hear the changeover click.",
+ w:"starter",
+ v:[{t:"Star Delta Starter Explained - Working Principle",c:"The Engineering Mindset",u:yt("h89TTwlNnpY")}],
+ quiz:[
+  {q:"Compared with DOL, a star-delta start reduces starting current to about…",o:["one third","one tenth","the same"],a:0,y:"In star each winding gets 1/√3 of the voltage, which makes line current one third."},
+  {q:"FLC on a nameplate stands for…",o:["Fault level current","Full load current","Fuse limit current"],a:1,y:"It is the current the motor draws at rated load."}]},
+
+{id:"vfd",m:2,t:"Variable frequency drives",
+ one:"Change the frequency and you change the motor speed.",
+ body:[
+  "Motor speed depends on supply frequency. The grid is fixed at 50 Hz, so a motor on the grid runs at one speed.",
+  "A VFD takes the 50 Hz supply, converts it to DC, then rebuilds AC at any frequency you ask for. 25 Hz gives roughly half speed.",
+  "For fans and pumps the saving is dramatic. Power needed falls with the cube of speed, so running at 80% speed takes only about half the power."],
+ formula:"Speed ∝ frequency      Fan or pump power ∝ speed³",
+ plant:"Extruders, calenders and tyre building machines need precise, adjustable speed, so they run on drives. When a line stops with a drive fault, the code on the VFD keypad is your first clue.",
+ w:"vfd",
+ v:[{t:"Variable Frequency Drives Explained - VFD Basics IGBT inverter",c:"The Engineering Mindset",u:yts("Variable Frequency Drives Explained - VFD Basics IGBT inverter The Engineering Mindset"),s:1},
+    {t:"Variable Frequency Drives Explained | VFD Basics - Part 2",c:"RealPars",u:yt("DXjXh0cF8Kc")}],
+ quiz:[
+  {q:"A 4-pole motor on a VFD set to 25 Hz has a field speed of about…",o:["1500 rpm","750 rpm","375 rpm"],a:1,y:"120 × 25 ÷ 4 = 750 rpm."},
+  {q:"A fan is slowed to 80% speed. Power drops to roughly…",o:["80%","64%","51%"],a:2,y:"0.8 × 0.8 × 0.8 = 0.512."}]},
+
+{id:"breakers-and-fuses",m:3,t:"Breakers, fuses and overloads",
+ one:"Protection devices cut the supply before a fault burns the cable or the motor.",
+ body:[
+  "Two things go wrong. An <b>overload</b> is slightly too much current for a long time, like a jammed conveyor. A <b>short circuit</b> is a massive current in an instant, like two wires touching.",
+  "A breaker has two trips inside. A bimetal strip heats up and bends on overload (slow). An electromagnet snaps it open on a short circuit (instant). A fuse simply melts.",
+  "Sizes go up with current: MCB for small circuits, MCCB for feeders and motors, ACB for the main incomer. A separate overload relay sits under each motor contactor."],
+ formula:"MCB < MCCB < ACB      Overload = slow thermal trip, Short circuit = instant magnetic trip",
+ plant:"Never just reset a tripped breaker. It tripped for a reason. Find out why first: check the load, the cable and the motor, then reset.",
+ w:"breaker",
+ v:[{t:"Why Circuit Breakers DON'T Protect People (electric shocks)",c:"The Engineering Mindset",u:yt("gqEu9t8HwW0")}],
+ quiz:[
+  {q:"A motor's bearing is seizing and it draws 20% extra current. Which protection should act?",o:["Thermal overload","Magnetic short-circuit trip","Lightning arrester"],a:0,y:"A small, sustained excess is an overload, handled by the thermal element."},
+  {q:"A breaker trips. First action?",o:["Reset it immediately","Fit a bigger breaker","Find the cause before resetting"],a:2,y:"Resetting onto a fault can cause fire or injury."}]},
+
+{id:"contactors-and-control",m:3,t:"Contactors and control circuits",
+ one:"A small switch tells a big switch what to do.",
+ body:[
+  "A <b>contactor</b> is a heavy-duty switch closed by an electromagnet. Energise its coil with a small current and its main contacts carry the large motor current.",
+  "That splits every starter into two circuits. The <b>power circuit</b> carries hundreds of amps to the motor. The <b>control circuit</b> carries a tiny current through push-buttons and the coil.",
+  "The classic start-stop circuit uses a spare contact on the contactor to keep its own coil energised after you release Start. This is called <b>latching</b> or holding. Press Stop and the latch drops."],
+ formula:"Stop (NC) → Overload (NC) → Start (NO) in parallel with holding contact → Coil",
+ plant:"NO means normally open, NC means normally closed. Those two abbreviations appear on every electrical drawing in the plant. Reading control drawings is the single most useful skill for fault-finding.",
+ w:"latch",
+ v:[{t:"What is a Contactor? How does it work?",c:"YouTube",u:yt("7BkwQrahHv0")}],
+ quiz:[
+  {q:"Why does the motor keep running after you release the Start button?",o:["The button sticks","A holding contact keeps the coil energised","The motor has a battery"],a:1,y:"The contactor's auxiliary contact bypasses the Start button."},
+  {q:"A Stop button is wired normally closed so that…",o:["a broken wire stops the machine","it is cheaper","it uses less power"],a:0,y:"If the wire breaks, the circuit opens and the machine stops. That is fail-safe design."}]},
+
+{id:"earthing",m:3,t:"Earthing",
+ one:"Earthing gives fault current an easy path home, so it does not go through you.",
+ body:[
+  "Every metal body, motor frame, panel and cable tray is bonded to earth with a green or green-yellow conductor.",
+  "If a live wire touches the metal body, a large current rushes through the earth wire and trips the breaker or blows the fuse. The body never rises to a dangerous voltage.",
+  "Without earthing, the metal body sits live and waits. The first person to touch it becomes the path. <b>Neutral</b> is different: it is the normal return path for current and carries current all the time."],
+ formula:"Earth: carries current only during a fault      Neutral: carries current in normal running",
+ plant:"Look for two separate earth strips on big motors and transformers. Rubber dust and friction also build static charge on machines and material, so bonding matters for fire safety too.",
+ w:null,
+ v:[{t:"What is Ground? Earth Ground/Earthing",c:"RimstarOrg",u:yt("zLW_7TPf310")}],
+ quiz:[
+  {q:"The main purpose of earthing a motor body is to…",o:["save energy","make the motor faster","make a fault trip the protection instead of shocking someone"],a:2,y:"A low-resistance earth path lets fault current flow and operate the protection."},
+  {q:"Which conductor carries current during normal operation?",o:["Neutral","Earth","Neither"],a:0,y:"Earth should carry current only during a fault."}]},
+
+{id:"plc-and-sensors",m:3,t:"PLCs and sensors",
+ one:"Sensors are the eyes, the PLC is the brain, contactors and valves are the muscles.",
+ body:[
+  "A <b>PLC</b> (programmable logic controller) is a rugged industrial computer. It reads inputs, runs its program, sets outputs, and repeats many times a second.",
+  "<b>Inputs</b> are push-buttons and sensors: proximity sensors detect metal, photoelectric sensors detect objects with light, thermocouples and RTDs measure temperature, transmitters measure pressure.",
+  "The program is often drawn as <b>ladder logic</b>, which looks like the relay circuit from the last lesson. Contacts in a row mean AND. Contacts side by side mean OR."],
+ formula:"Scan: Read inputs → Run logic → Write outputs → repeat",
+ plant:"Curing a tyre is a timed recipe of temperature and pressure, run by a PLC. If an output is not coming on, check the input LEDs on the PLC first. Nine times out of ten a sensor is not giving its signal.",
+ w:"plc",
+ v:[{t:"PLC Basics | Programmable Logic Controller",c:"RealPars",u:yts("PLC Basics Programmable Logic Controller RealPars"),s:1},
+    {t:"Photoelectric Sensor Explained",c:"RealPars",u:yt("l1rjErRvbgw")}],
+ quiz:[
+  {q:"Two contacts drawn in series on a ladder rung behave as…",o:["OR","AND","NOT"],a:1,y:"Both must be closed for the rung to be true."},
+  {q:"Which sensor would you choose to detect a steel part without touching it?",o:["Thermocouple","Inductive proximity sensor","Pressure transmitter"],a:1,y:"Inductive proximity sensors detect metal objects at close range."}]},
+
+{id:"multimeter",m:4,t:"Using a multimeter",
+ one:"Your meter is how you see electricity. Learn it before you need it.",
+ body:[
+  "<b>Voltage</b> is measured across two points, with the circuit live. Select V~ for AC or V⎓ for DC, and start on a range higher than you expect.",
+  "<b>Continuity and resistance</b> are measured only on a dead, isolated circuit. The beep tells you a wire or fuse is unbroken.",
+  "<b>Current</b> in a plant is measured with a clamp meter around one conductor, never by breaking the circuit. And follow the proving routine: test the meter on a known live source, test your circuit, then test the meter again."],
+ formula:"Prove meter → Test circuit → Prove meter again",
+ plant:"Use a meter rated CAT III or CAT IV for panel work, with good leads. Clamp one phase at a time: a clamp around a whole three-core cable reads zero.",
+ w:null,
+ v:[{t:"Learn how to use a multimeter",c:"The Engineering Mindset",u:yt("4lAyzRxsbDc")}],
+ quiz:[
+  {q:"When may you use the continuity (beep) setting?",o:["Only on a dead, isolated circuit","On any live circuit","Only on DC"],a:0,y:"Resistance and continuity ranges inject their own small current and must never be used on live circuits."},
+  {q:"You clamp a meter around a complete three-core motor cable and it reads 0 A. Why?",o:["The motor is off","The three phase currents cancel out","The clamp is broken"],a:1,y:"In a healthy balanced cable the currents sum to zero. Clamp one core at a time."}]}
+];
+
+
+L.push(
+{id:"what-is-electricity",t:"What electricity is",
+ one:"Electricity is tiny charged particles, called electrons, being pushed along a wire.",
+ body:[
+  "Everything is made of atoms, and every atom contains electrons. In metals some electrons are loose. They can drift from one atom to the next. Materials like that are <b>conductors</b>. In rubber, plastic or glass the electrons are held tight, so nothing flows. Those are <b>insulators</b>.",
+  "A battery or generator works like a pump. It pushes electrons out of one terminal and takes them back at the other. They only flow if there is a complete loop, called a <b>circuit</b>. Break the loop anywhere and the flow stops everywhere. That is all a switch does.",
+  "The electrons carry energy from the source to the load. A lamp turns it into light, a heater into heat, a motor into movement."],
+ formula:"Source → conductor → load → conductor → back to source   (a complete loop)",
+ plant:"Every cable is a conductor (copper or aluminium) wrapped in an insulator (PVC or XLPE). Damaged insulation is one of the most common causes of faults. Tyre rubber is a special case: the carbon black in it makes it slightly conductive, which helps static charge leak away.",
+ w:"sorter",
+ v:[{t:"How electricity works",c:"The Engineering Mindset",u:yt("mc979OhitAg")}],
+ quiz:[
+  {q:"What does a switch actually do?",o:["Makes electricity","Breaks or completes the loop","Stores electrons"],a:1,y:"Current flows only in a complete loop. A switch opens or closes that loop."},
+  {q:"Which of these is used to insulate cables?",o:["Copper","Aluminium","PVC"],a:2,y:"PVC holds its electrons tightly, so no current passes through it."}]},
+
+{id:"series-and-parallel",t:"Series and parallel circuits",
+ one:"In series, components share one path. In parallel, each gets its own.",
+ body:[
+  "<b>Series</b> means one after another on a single path. The same current flows through every component, and the supply voltage is shared between them. If one breaks, everything stops.",
+  "<b>Parallel</b> means side by side, each connected straight across the supply. Every component gets the full voltage and works independently. The currents add up at the source.",
+  "This is why adding more machines loads the feeder: each new parallel load draws its own current on top of the others."],
+ formula:"Series: R = R1 + R2        Parallel: 1/R = 1/R1 + 1/R2",
+ plant:"Loads are connected in parallel so each gets full voltage. Safety devices in a control circuit, such as emergency stops, guard switches and overloads, are wired in series so that any one of them can stop the machine.",
+ w:"sp",
+ v:[{t:"DC parallel circuits explained - The basics how parallel circuits work",c:"The Engineering Mindset",u:yt("5uyJezQNSHw")}],
+ quiz:[
+  {q:"Two 10 Ω resistors in series give a total of…",o:["5 Ω","10 Ω","20 Ω"],a:2,y:"Series resistances add: 10 + 10 = 20 Ω."},
+  {q:"Why are emergency stop buttons wired in series?",o:["So pressing any one of them breaks the circuit","To save wire","So all must be pressed together"],a:0,y:"In a series chain, one open contact stops the current for everything."}]},
+
+{id:"magnetism-and-induction",t:"Magnetism and induction",
+ one:"Current makes magnetism, and changing magnetism makes current. Every motor and transformer runs on this.",
+ body:[
+  "A wire carrying current has a magnetic field around it. Wind the wire into a coil and you get an <b>electromagnet</b> that you can switch on and off.",
+  "It works in reverse too. Move a magnet near a coil and a voltage appears in the coil. This is <b>induction</b>. It only happens while the magnetic field is changing. Hold the magnet still and you get nothing.",
+  "Third idea: a wire carrying current inside a magnetic field feels a push. Arrange that push in a circle and you have a motor."],
+ formula:"Induced voltage ∝ number of turns × how fast the magnetic field changes",
+ plant:"Contactor coils, solenoid valves and brakes are electromagnets. Generators, transformers and motors all use induction. Learn this one idea well and the whole Machines stage becomes easy.",
+ w:"induce",
+ v:[{t:"How does an Electric Motor work? (DC Motor)",c:"YouTube",u:yt("CWulQ1ZSE3c")}],
+ quiz:[
+  {q:"A magnet sits perfectly still inside a coil. The induced voltage is…",o:["zero","maximum","equal to the supply"],a:0,y:"Induction needs a changing magnetic field. No change, no voltage."},
+  {q:"Which of these is an electromagnet at work?",o:["A fuse","A contactor coil","A cable lug"],a:1,y:"Energising the coil creates a magnetic field that pulls the contacts closed."}]},
+
+{id:"reading-drawings",t:"Reading electrical drawings",
+ one:"Drawings are the map of the plant. Learn the symbols and you can find any fault.",
+ body:[
+  "A <b>single line diagram</b> (SLD) shows how power reaches every machine. One line stands for all three phases. Follow it from the incoming supply through transformers and panels down to a motor.",
+  "A <b>control drawing</b> shows how one machine is controlled. It is drawn as rungs between two supply lines. Read it left to right, top to bottom, like a page.",
+  "Every device has a tag such as Q1, K3 or M2. The same tag appears on the drawing, on the device label and on the wire ferrules, so you can go from paper to panel. Contacts are always drawn in their resting state, with no power applied."],
+ formula:"Q = breaker or isolator   K = contactor or relay   F = fuse or overload   S = switch or push-button   M = motor   T = transformer",
+ plant:"Every machine has a drawing set, usually in the panel door pocket or with the maintenance office. Pick one small machine and trace its motor circuit from the breaker to the motor terminals.",
+ w:"sld",
+ v:[{t:"How to read a single line diagram",c:"YouTube",u:yts("how to read electrical single line diagram for beginners"),s:1}],
+ quiz:[
+  {q:"A single line diagram shows…",o:["the PLC program","how power flows from the source to the loads","cable tray routes"],a:1,y:"It is the power map of the plant, simplified to one line per circuit."},
+  {q:"On a drawing, contacts are shown…",o:["as they are when the machine runs","in their resting, de-energised state","in whichever way is neater"],a:1,y:"That convention lets you work out what changes when each coil is energised."}]},
+
+{id:"fault-finding",t:"Fault-finding method",
+ one:"Do not guess. Follow the energy from the source to the load until you find where it stops.",
+ body:[
+  "<b>Ask and look first.</b> What was the machine doing? Any alarm, smell, noise or lamp? What changed since it last worked?",
+  "<b>Check the simple things.</b> Emergency stop pressed, breaker tripped, overload tripped, guard open, sensor knocked out of position.",
+  "<b>Then measure in order.</b> Decide whether the fault is in the power circuit or the control circuit. Does the contactor pull in? Check voltage point by point until it disappears. Fix the cause, not the symptom, and write it down."],
+ formula:"Ask → Look → Check the simple things → Measure in order → Fix the cause → Record",
+ plant:"Most breakdowns are simple: a tripped overload, a pressed emergency stop, a misaligned sensor, a loose wire. Experienced technicians check those first. Keep a log, because repeat faults point to the real root cause.",
+ w:"fault",
+ v:[{t:"PLC Troubleshooting 101: Basic Tips and Tricks",c:"RealPars",u:yts("PLC Troubleshooting 101 Basic Tips and Tricks RealPars"),s:1}],
+ quiz:[
+  {q:"A machine has stopped. Your first step is to…",o:["start replacing parts","ask the operator what happened and look at the alarms","reset everything"],a:1,y:"Two minutes of asking and looking often saves an hour of measuring."},
+  {q:"An overload relay keeps tripping. The right response is to…",o:["turn its setting up","bypass it","find out why the motor draws too much current"],a:2,y:"The relay is reporting a real problem: a jam, a bad bearing, low voltage or a failing motor."}]}
+);
+
+const ys=(t,q)=>({t,c:"YouTube",u:yts(q),s:1});
+L.push(
+{id:"capacitors-and-inductors",t:"Capacitors, inductors and impedance",
+ one:"Resistors turn energy into heat. Capacitors and inductors store it and hand it back, and that shifts the current in time.",
+ body:["A <b>capacitor</b> is two plates with insulation between them. It stores energy as electric charge. It blocks steady DC but lets AC through, more easily as the frequency rises.",
+  "An <b>inductor</b> is a coil. It stores energy in its magnetic field and resists any change in current. It passes DC easily and opposes AC, more strongly as the frequency rises.",
+  "Their opposition to AC is called <b>reactance</b>, measured in ohms like resistance. Resistance and reactance together make <b>impedance</b> (Z). In an inductor the current lags the voltage. In a capacitor it leads. That time shift is where power factor comes from."],
+ formula:"XL = 2πfL      XC = 1 ÷ (2πfC)      Z = √(R² + X²)",
+ plant:"Motors, transformers and solenoids are inductive. Capacitors sit in APFC panels, single-phase motors, drive DC buses and power supplies. A capacitor can hold a dangerous charge after power-off: wait, discharge and test before touching.",
+ w:"react",v:[ys("Capacitors Explained - The basics how capacitors work","Capacitors Explained The basics how capacitors work The Engineering Mindset"),ys("Inductors Explained - The basics how inductors work","Inductors Explained The basics how inductors work working principle The Engineering Mindset")],
+ quiz:[{q:"As frequency rises, the reactance of an inductor…",o:["rises","falls","stays the same"],a:0,y:"XL = 2πfL, so it is proportional to frequency."},
+  {q:"You have isolated a capacitor bank. Before touching it you…",o:["start work at once","wait the discharge time and test for voltage","switch it back on briefly"],a:1,y:"Capacitors store charge after the supply is removed."}]},
+
+{id:"other-motors-and-generators",t:"Other motors and generators",
+ one:"The induction motor is the workhorse, but you will meet several other machines.",
+ body:["<b>DC motors</b> use brushes and a commutator. Their speed is easy to control, so older lines used them. Brushes wear and need attention, and AC motors with drives have replaced most of them.",
+  "<b>Synchronous motors</b> turn at exactly the field speed with no slip. <b>Servo motors</b> are permanent-magnet synchronous motors with an encoder that reports position, run by a servo drive for precise moves. <b>Single-phase motors</b> need a capacitor to start and drive small fans and pumps.",
+  "A <b>generator</b> (alternator) is the motor idea in reverse. An engine spins a magnetised rotor inside stator windings and a voltage is induced. Engine speed sets the frequency. The field current, controlled by the AVR, sets the voltage."],
+ formula:"Generator frequency: f = P × N ÷ 120      (4 poles at 1500 rpm gives 50 Hz)",
+ plant:"Tyre building machines use servo axes for accurate positioning. Some older mixers or calenders may still have large DC motors. The DG set in the powerhouse is an alternator driven by a diesel engine.",
+ w:null,v:[ys("Servo Motor Explained","Servo Motor Explained The Engineering Mindset"),ys("AC Electrical Generator Basics - How electricity is generated","AC Electrical Generator Basics How Electricity is Generated The Engineering Mindset")],
+ quiz:[{q:"A 4-pole DG alternator must run at what speed for 50 Hz?",o:["3000 rpm","1500 rpm","750 rpm"],a:1,y:"N = 120 × 50 ÷ 4 = 1500 rpm."},
+  {q:"Which motor uses an encoder to report its exact position?",o:["Servo motor","Single-phase fan motor","Squirrel-cage induction motor on DOL"],a:0,y:"The servo drive uses that feedback to correct the position continuously."}]},
+
+{id:"power-electronics",t:"Power electronics",
+ one:"Electronic switches with no moving parts that convert power from one form to another.",
+ body:["A <b>diode</b> is a one-way valve for current. Four or six of them make a <b>rectifier</b>, which turns AC into DC.",
+  "A <b>thyristor</b> (SCR) is a diode you switch on with a small gate pulse. It is used in soft starters and heater controls. An <b>IGBT</b> is a fast switch that turns on and off thousands of times a second. It is the heart of every drive and inverter.",
+  "From these you can build every conversion: AC to DC (rectifier, power supply), DC to AC (inverter, UPS), AC to AC at another frequency (VFD) and DC to DC."],
+ formula:"Rectifier: AC → DC      Inverter: DC → AC      VFD: AC → DC → AC      SMPS: AC → 24 V DC",
+ plant:"The 24 V power supply, every drive, every UPS, soft starters, battery chargers and LED lights are power electronics. They are efficient but dislike heat and dust: keep panel filters clean and cooling fans running.",
+ w:"rect",v:[{t:"How Inverters Work - Working principle rectifier",c:"The Engineering Mindset",u:yt("ln9VZIL8rVs")}],
+ quiz:[{q:"Which circuit converts AC to DC?",o:["Inverter","Rectifier","Transformer"],a:1,y:"A rectifier uses diodes to let current pass in one direction only."},
+  {q:"What shortens the life of drives and power supplies most?",o:["Heat and dust","Low humidity","Running at rated load"],a:0,y:"Blocked filters and failed fans let heat build up in the semiconductors and capacitors."}]},
+
+{id:"plant-power-distribution",t:"Plant power distribution",
+ one:"Power enters at high voltage in one place and fans out in steps to every machine.",
+ body:["The utility supplies a large plant at high voltage, 33 kV or more. In the <b>substation</b>, HT breakers and transformers bring it down to 433 V.",
+  "From the transformer, power goes to the main LT board (<b>PCC</b>), then to <b>MCCs</b> and distribution boards near the machines. At each step the breakers get smaller.",
+  "<b>DG sets</b> take over if the grid fails, after a short start-up delay. A <b>UPS</b> with batteries covers that gap for loads that must not blink: PLCs, servers and critical controls."],
+ formula:"Grid → HT breaker → Transformer → PCC → MCC → Starter → Motor",
+ plant:"A power loss in the middle of a cure or a mix can scrap the product, so tyre plants take backup power seriously. Learn which loads in your area are on the DG and which are on UPS.",
+ w:"outage",v:[ys("How do Substations Work?","How do substations work The Engineering Mindset")],
+ quiz:[{q:"What keeps a PLC running in the seconds before the DG starts?",o:["The APFC panel","The UPS","The transformer"],a:1,y:"UPS batteries supply the load with no break."},
+  {q:"PCC stands for…",o:["Power control centre","Primary cable connection","Phase current controller"],a:0,y:"It is the main low-voltage switchboard fed from the transformer."}]},
+
+{id:"cables-and-terminations",t:"Cables and terminations",
+ one:"A cable is chosen for the current it carries, the distance it runs and the place it runs through.",
+ body:["Every cable has a <b>current rating</b>, set by how hot its insulation may get. Thicker conductors carry more. The rating falls when cables are bunched together or pass through hot areas, so they are derated.",
+  "Every cable also has resistance, so some voltage is lost along it. This is <b>voltage drop</b>. A long run needs a thicker cable than the current alone suggests.",
+  "Most cable faults happen at the ends. A <b>lug</b> crimped with the right tool, a <b>gland</b> that grips and seals the cable, and correctly tightened terminals matter more than the cable itself."],
+ formula:"Three-phase voltage drop ≈ √3 × I × R (Ω per km) × length (km)",
+ plant:"Power cables are aluminium or copper with XLPE or PVC insulation, often armoured. Control cables are multi-core copper with numbered cores. Flexible cables on moving machine parts fail from fatigue: suspect them first on an intermittent fault.",
+ w:"vdrop",v:[ys("Cable sizing and voltage drop explained","cable size calculation voltage drop explained for beginners")],
+ quiz:[{q:"Why might a long run need a thicker cable than the current rating requires?",o:["To limit voltage drop","To look neater","To raise the power factor"],a:0,y:"Resistance rises with length, so the voltage lost along the cable rises too."},
+  {q:"A slightly loose terminal carrying a heavy current will…",o:["save energy","heat up","trip the PLC"],a:1,y:"Extra contact resistance turns into heat: P = I² × R."}]},
+
+{id:"switchgear-and-protection-relays",t:"Switchgear and protection relays",
+ one:"At high currents and voltages, a separate relay does the thinking and tells the breaker when to open.",
+ body:["Large currents cannot go straight into instruments. A <b>current transformer</b> (CT) scales the current down, for example 800 A to 5 A. A <b>voltage transformer</b> (PT or VT) scales high voltage down to 110 V. Meters and relays work from these small signals.",
+  "A <b>protection relay</b> watches those signals. If the current is too high for too long (overcurrent), or current is leaking to earth (earth fault), it energises the breaker's trip coil.",
+  "The breaker does the heavy work of breaking the arc. On HT systems this is usually a <b>VCB</b>, a vacuum circuit breaker. On the main LT board it is an <b>ACB</b>."],
+ formula:"CT ratio 800/5: 800 A in the busbar gives 5 A to the relay",
+ plant:"Relay settings are calculated so that the breaker nearest the fault trips first. They are not adjusted on the shop floor. If a relay has tripped, record its indication or fault record before anyone resets it.",
+ w:"ct",v:[ys("Overcurrent protection relay explained","overcurrent protection relay working principle explained CT")],
+ quiz:[{q:"Why must the secondary of a live CT never be left open?",o:["The meter reads low","A dangerously high voltage develops across it","The CT loses its ratio"],a:1,y:"A CT forces its secondary current to flow. With no path, the voltage rises to a dangerous level."},
+  {q:"A protection relay has tripped a feeder. Your first action is to…",o:["reset it quickly","record what the relay indicates","raise its setting"],a:1,y:"The indication is the evidence of what kind of fault occurred."}]},
+
+{id:"power-quality",t:"Power quality",
+ one:"Clean power is a steady, balanced sine wave. Real plant power is rarely that clean.",
+ body:["<b>Voltage dips</b> are short drops, often when a large motor starts or a fault happens somewhere on the grid. They can trip drives and reset controllers.",
+  "<b>Harmonics</b> are distortions of the sine wave caused by drives, rectifiers and other electronic loads. They overheat transformers, cables and capacitors.",
+  "<b>Unbalance</b> means the three phase voltages are not equal. A small voltage unbalance causes a much larger current unbalance in motors, and extra heating."],
+ formula:"THD = total harmonic distortion in %      5th harmonic = 250 Hz, 7th = 350 Hz",
+ plant:"A plant full of drives has harmonics. Signs: capacitor banks that fail often, transformers that run hot and hum, nuisance trips with no clear cause. The cures are line reactors, harmonic filters and detuned capacitor banks.",
+ w:"harm",v:[ys("Harmonics in power systems explained","harmonics in electrical power system explained simply")],
+ quiz:[{q:"The main source of harmonics in a plant is…",o:["drives and rectifiers","heaters","earthing"],a:0,y:"They draw current in pulses instead of a smooth sine wave."},
+  {q:"On a 50 Hz system the 5th harmonic is at…",o:["55 Hz","250 Hz","500 Hz"],a:1,y:"5 × 50 = 250 Hz."}]},
+
+{id:"machine-safety-circuits",t:"Machine safety circuits",
+ one:"Safety circuits are built so that any failure stops the machine and never starts it.",
+ body:["An <b>emergency stop</b> is a latching, normally closed button. Pressing it and cutting its wire both open the circuit. <b>Guard switches</b> and <b>light curtains</b> do the same when a guard opens or a beam is broken.",
+  "A <b>safety relay</b> or safety PLC monitors these devices through two separate channels. If the channels disagree, or a wire shorts, it refuses to reset.",
+  "The safety relay then drops out <b>two contactors in series</b>, so the motor stops even if one contactor has welded shut. It checks that both have dropped before it allows a restart."],
+ formula:"Two channels in → safety relay → two contactors out, with feedback",
+ plant:"Tyre machines have nip points, presses and heavy moving parts, so they carry many safety devices. Never bridge, tape or bypass one, even 'just to test'. A bypassed safety device is behind many serious injuries.",
+ w:null,v:[ys("Safety relay explained","safety relay working principle explained emergency stop dual channel")],
+ quiz:[{q:"Why does a safety circuit use two contactors in series?",o:["To share the current","So the motor still stops if one has welded","To start more smoothly"],a:1,y:"Redundancy: one failure cannot remove the protection."},
+  {q:"Emergency stop contacts are wired…",o:["normally closed","normally open","either way"],a:0,y:"A broken wire then stops the machine, which is the safe direction to fail."}]},
+
+{id:"instrumentation-and-control-loops",t:"Instrumentation and control loops",
+ one:"Measure, compare, correct. That loop holds temperature, pressure and speed where they should be.",
+ body:["A <b>transmitter</b> measures something physical, such as temperature, pressure, level or flow, and sends it as a standard signal, usually 4 to 20 mA.",
+  "A <b>controller</b> compares that measurement (the process value) with the target (the setpoint). The difference is the error.",
+  "The controller adjusts a <b>final element</b>, such as a control valve, heater or drive speed, to shrink the error. Most use the <b>PID</b> method: P reacts to the error now, I to error that has persisted, D to how fast it is changing."],
+ formula:"Value = Low + (mA − 4) ÷ 16 × (High − Low)",
+ plant:"Curing a tyre means holding temperature and pressure to a recipe for a set time. Those are control loops with RTDs or thermocouples, pressure transmitters and control valves. A sticky valve or a drifting sensor shows up as product variation long before it shows up as a breakdown.",
+ w:"ma",v:[ys("PID Controller Explained","PID Controller Explained RealPars")],
+ quiz:[{q:"A 4 to 20 mA transmitter is sending 0 mA. That means…",o:["the reading is zero","a broken wire or a failed transmitter","the reading is at maximum"],a:1,y:"The lowest valid signal is 4 mA. Zero means the loop is broken."},
+  {q:"In PID control, the I (integral) term…",o:["removes an error that persists","reacts to sudden change","sets the alarm limits"],a:0,y:"It keeps adding correction for as long as an error remains."}]},
+
+{id:"hmi-scada-and-networks",t:"HMI, SCADA and industrial networks",
+ one:"Networks let machines, drives and people share data along one cable instead of hundreds of wires.",
+ body:["An <b>HMI</b> is the operator's touch screen on a machine. <b>SCADA</b> is software that gathers data from many machines for a control room: live values, alarms, trends and reports.",
+  "Devices talk over industrial networks. Common names are <b>Modbus</b>, <b>Profibus</b>, <b>Profinet</b> and <b>EtherNet/IP</b>. Every device has an address, and one wrong or duplicated address stops communication.",
+  "With <b>remote I/O</b>, sensors are wired to a small station near the machine and one network cable carries everything to the PLC."],
+ formula:"Field devices → remote I/O → PLC → HMI and SCADA → plant systems",
+ plant:"Alarm history and trends are your best fault-finding tools. Before opening a panel, read what the HMI says happened, in what order and at what time. A 'bus fault' usually means a cable, connector, address or power problem at one station.",
+ w:null,v:[ys("What is SCADA?","What is SCADA RealPars")],
+ quiz:[{q:"A line has stopped. The best first source of information is…",o:["the HMI alarm history","the motor nameplate","the energy meter"],a:0,y:"It records what happened, in order, with times."},
+  {q:"Two devices on a network are given the same address. The result is…",o:["faster communication","a communication fault","nothing"],a:1,y:"Every device needs a unique address."}]},
+
+{id:"maintenance-and-testing",t:"Maintenance and testing",
+ one:"Most electrical failures give warning: heat, noise, vibration, falling insulation. Maintenance is the habit of looking for it.",
+ body:["<b>Preventive</b> maintenance is done on a schedule: clean, tighten, inspect, lubricate. <b>Condition-based</b> maintenance measures the machine's health and acts when a trend turns bad.",
+  "The key tests are <b>insulation resistance</b> of windings and cables, <b>thermal imaging</b> of live panels to find hot joints, <b>vibration</b> and bearing checks on motors, and current on all three phases.",
+  "A motor's enemies are heat, dirt, moisture and bad bearings. Keep the cooling fins clean, check that the fan and its cover are intact, and grease bearings by the maker's schedule."],
+ formula:"PI (polarisation index) = insulation resistance at 10 min ÷ at 1 min",
+ plant:"Carbon black and rubber dust get everywhere. They block motor cooling fins and panel filters and can form conductive deposits. Here, cleaning is electrical maintenance.",
+ w:"pi",v:[ys("Insulation resistance testing of motors explained","insulation resistance test megger motor testing explained")],
+ quiz:[{q:"Thermal imaging of a live panel is used to find…",o:["loose, high-resistance joints","wrong cable colours","PLC program errors"],a:0,y:"A poor joint runs hotter than its neighbours and shows clearly on the image."},
+  {q:"Before an insulation resistance test on a motor fed by a drive you must…",o:["leave the drive connected","isolate, lock out and disconnect the drive","run the motor warm"],a:1,y:"The test voltage will destroy the drive's electronics."}]},
+
+{id:"energy-and-efficiency",t:"Energy and efficiency",
+ one:"The cheapest unit of electricity is the one you do not use.",
+ body:["The bill has two main parts: <b>energy</b>, the kWh used, and <b>maximum demand</b>, the highest kVA drawn in any billing interval. Lowering the peak saves money even when total energy stays the same.",
+  "Motors use most of a plant's electricity. Savings come from switching off idle machines, sizing motors correctly, <b>high-efficiency motors</b> (IE3 and above) and drives on fans and pumps.",
+  "<b>Compressed air</b> is one of the most expensive utilities, because most of the electricity fed to a compressor ends up as heat. Leaks, excess pressure and using air for cleaning waste a great deal."],
+ formula:"Saving (kW) = Output kW × (1 ÷ old efficiency − 1 ÷ new efficiency)",
+ plant:"Tyre plants are energy-intensive, with steam for curing, large mixers and a lot of compressed air. Energy projects are a visible way for a young engineer to contribute. Start by measuring what your area uses per shift and what runs when nothing is being made.",
+ w:"eff",v:[ys("Energy efficient motors IE3 explained","energy efficient motors IE3 explained savings")],
+ quiz:[{q:"The maximum demand charge depends on…",o:["total kWh in the month","the highest kVA drawn in any billing interval","the number of motors"],a:1,y:"One short peak can set the charge for the whole month."},
+  {q:"The best first step to cut compressed air cost is to…",o:["buy a bigger compressor","find and fix leaks","raise the pressure"],a:1,y:"Leaks waste air all day, every day."}]},
+
+{id:"standards-and-permits",t:"Standards, permits and hazardous areas",
+ one:"The rules were written from past accidents. Know which ones apply before you do the job.",
+ body:["Electrical work in India is governed by safety regulations made under the Electricity Act by the Central Electricity Authority, and by Indian Standards (IS), many of them aligned with international IEC standards. Your plant turns these into its own procedures.",
+  "A <b>permit to work</b> is written permission for a risky job: HT switching, work at height, hot work, confined spaces. It states the isolation, the precautions and who is responsible. No permit, no job.",
+  "<b>PPE</b> is the last layer: insulated gloves, safety shoes, a face shield and arc-rated clothing for switching. Where flammable vapour or dust may be present, equipment must be specially certified (flameproof, Ex-rated) so that it cannot ignite the atmosphere."],
+ formula:"Eliminate → Isolate → Engineer → Procedure → PPE     (most effective first)",
+ plant:"Solvent and cement areas and fine carbon black dust can create flammable atmospheres, so parts of a tyre plant are classed as hazardous areas. Never take an ordinary tool, lamp or phone into one, and never replace Ex equipment with a standard part.",
+ w:null,v:[ys("Permit to work system explained","permit to work system electrical safety explained")],
+ quiz:[{q:"In the order of safety controls, PPE is…",o:["the first choice","the last line of defence","not needed if you are careful"],a:1,y:"It only limits injury when every other control has failed."},
+  {q:"A light fitting fails in a hazardous area. You replace it with…",o:["any fitting of the same wattage","the same Ex-certified type","an LED strip"],a:1,y:"Only certified equipment is safe in a flammable atmosphere."}]}
+);
+const ORDER=[["safety-loto"],["what-is-electricity","voltage-current-resistance","series-and-parallel","power-and-energy"],["ac-and-dc","magnetism-and-induction","capacitors-and-inductors","three-phase","power-factor"],["transformers","induction-motors","motor-starters","vfd","other-motors-and-generators","power-electronics"],["plant-power-distribution","cables-and-terminations","breakers-and-fuses","switchgear-and-protection-relays","earthing","power-quality"],["contactors-and-control","machine-safety-circuits","plc-and-sensors","instrumentation-and-control-loops","hmi-scada-and-networks","reading-drawings"],["multimeter","fault-finding","maintenance-and-testing","energy-and-efficiency","standards-and-permits"]];
+L=ORDER.flatMap((ids,m)=>ids.map(id=>Object.assign(L.find(l=>l.id===id),{m})));
+L.find(l=>l.id==="what-is-electricity").w="elec";L.find(l=>l.id==="voltage-current-resistance").w="ohm2";
+
+/* one thing to find or do on the shop floor for each lesson */
+const F={
+"safety-loto":"Read your plant's LOTO procedure and find where the padlocks and tags are kept.",
+"what-is-electricity":"Look at a cut cable sample or a cable drum label. Identify the conductor metal and the insulation material.",
+"voltage-current-resistance":"Read three motor nameplates. Write down the volts and amps of each.",
+"series-and-parallel":"Count the emergency stop buttons on one machine. They are all in one series chain.",
+"power-and-energy":"Find the energy meter on a main panel. Note the kWh reading now and again tomorrow.",
+"ac-and-dc":"Inside an open panel (with a technician), spot the 24 V DC power supply unit.",
+"magnetism-and-induction":"Watch and listen to a contactor pull in when a machine starts.",
+"three-phase":"Find the R, Y and B colour marks on a busbar or cable termination.",
+"power-factor":"Find the APFC panel and read the power factor on its display.",
+"transformers":"Visit the substation with your supervisor. Read a transformer nameplate: kVA and both voltages.",
+"induction-motors":"From one nameplate, work out the number of poles from the rpm.",
+"motor-starters":"Find one DOL starter and one star-delta starter. Count the contactors in each.",
+"vfd":"Find a drive. Read the output frequency and motor current on its keypad.",
+"breakers-and-fuses":"Spot an MCB, an MCCB and an ACB. Note the amp rating of each.",
+"contactors-and-control":"On a starter, identify the contactor, the overload relay and the start and stop buttons.",
+"earthing":"Find the earth conductors on a motor frame and follow them to the earth strip.",
+"plc-and-sensors":"Watch the PLC input LEDs change while a machine runs. Match one LED to its sensor.",
+"reading-drawings":"Get one machine's drawing. Find Q, K and M on paper, then find the same tags in the panel.",
+"multimeter":"With a technician, measure a 24 V DC control supply. Prove the meter before and after.",
+"fault-finding":"Shadow one breakdown. Write down the symptom, the cause and the fix."};
+
+
+/* ---------- circuit diagrams (IEC-style symbols) ---------- */
+const P_=(d,c="w")=>`<path class="${c}" d="${d}"/>`;
+const T_=(x,y,t,a="start",c="")=>`<text x="${x}" y="${y}" text-anchor="${a}" class="${c}">${t}</text>`;
+const C_=(x,y,r,c="w f")=>`<circle class="${c}" cx="${x}" cy="${y}" r="${r}"/>`;
+const R_=(x,y,w,h,c="w f")=>`<rect class="${c}" x="${x}" y="${y}" width="${w}" height="${h}"/>`;
+const dot=(x,y)=>`<circle class="d" cx="${x}" cy="${y}" r="3.2"/>`;
+const SV=(w,h,label,inner)=>`<svg class="ckt" viewBox="0 0 ${w} ${h}" role="img" aria-label="${label}">${inner}</svg>`;
+const cell=(x,y)=>P_(`M${x-12} ${y-6}H${x+12}`)+P_(`M${x-6} ${y+6}H${x+6}`,"w thick")+T_(x+16,y-8,"+");
+const lampS=(x,y)=>C_(x,y,12)+P_(`M${x-8} ${y-8}L${x+8} ${y+8}M${x+8} ${y-8}L${x-8} ${y+8}`);
+const meterS=(x,y,l)=>C_(x,y,13)+T_(x,y+5,l,"middle","bold");
+const motorS=(x,y)=>C_(x,y,20)+T_(x,y+2,"M","middle","bold")+T_(x,y+14,"3~","middle","sm");
+const noV=(x,y)=>P_(`M${x} ${y+12}L${x-11} ${y-10}`);
+const ncV=(x,y)=>P_(`M${x} ${y+12}L${x+9} ${y-13}M${x} ${y-12}H${x+11}`);
+const pbS=(x,y)=>P_(`M${x-6} ${y}H${x-20}M${x-20} ${y-6}V${y+6}`,"w thin");
+const coilS=(x,y)=>R_(x-14,y-9,28,18);
+const earthS=(x,y)=>P_(`M${x-10} ${y}H${x+10}M${x-6} ${y+4}H${x+6}M${x-2} ${y+8}H${x+2}`);
+const xS=(x,y)=>P_(`M${x-4} ${y-4}L${x+4} ${y+4}M${x+4} ${y-4}L${x-4} ${y+4}`);
+const mini=(inner,name)=>"<div>"+SV(90,70,name,inner)+name+"</div>";
+
+const D={
+"safety-loto":{cap:"Where the lock goes",svg:SV(520,120,"Supply, locked isolator, contactor and motor",
+  T_(8,54,"415 V")+P_("M50 50H170")+P_("M170 50L197 34")+P_("M200 50H280")+P_("M280 50L307 38")+P_("M310 50H400")+motorS(420,50)+dot(170,50)+dot(200,50)+dot(280,50)+dot(310,50)+
+  R_(178,60,16,12,"w bad f")+P_("M182 60v-4a4 4 0 0 1 8 0v4","w bad")+
+  T_(186,92,"Q1 isolator","middle","bold")+T_(186,108,"off, locked, tagged","middle","m")+T_(295,92,"K1 contactor","middle","bold")+T_(295,108,"not isolation","middle","m")+T_(420,92,"Motor","middle","bold")),
+ steps:["Power arrives from the left.","Q1 is the isolator. Open and padlocked, it physically disconnects the machine from the supply.","K1 is the contactor. The stop button and emergency stop only open K1, and the control circuit can close it again.","So your lock always goes on Q1, never on a push-button."]},
+"what-is-electricity":{cap:"The simplest circuit, in standard symbols",svg:SV(360,180,"Cell, switch and lamp in one loop",
+  P_("M60 84V40H160")+P_("M160 40L197 25")+P_("M200 40H300V78")+P_("M300 102V140H60V96")+cell(60,90)+lampS(300,90)+dot(160,40)+dot(200,40)+
+  T_(40,94,"cell","end","m")+T_(180,62,"switch (open)","middle","m")+T_(320,94,"lamp","start","m")),
+ steps:["This is the circuit from the animation below, drawn the way engineers draw it.","A long bar and a short bar make a cell. The long bar is the positive side.","The angled line is an open switch. When closed it lies flat across the gap.","A circle with a cross is a lamp. Plain lines are wires.","Every drawing in the plant is built from a small set of symbols like these."]},
+"voltage-current-resistance":{cap:"Ammeter in series, voltmeter in parallel",svg:SV(430,200,"Cell, ammeter, resistor and voltmeter",
+  P_("M60 94V40H187")+P_("M213 40H340V80")+P_("M340 120V160H60V106")+cell(60,100)+meterS(200,40,"A")+R_(333,80,14,40)+
+  P_("M340 60H395V87")+P_("M395 113V140H340")+meterS(395,100,"V")+dot(340,60)+dot(340,140)+
+  T_(40,104,"24 V","end")+T_(322,104,"R","end","bold")+T_(120,32,"I →","middle","bold")),
+ steps:["The cell on the left pushes current round the loop in the direction of the arrow.","The ammeter A sits inside the loop, in series, so all the current passes through it.","The voltmeter V is connected across the resistor, in parallel. It reads the voltage between the resistor's two ends.","Ohm's law links the three: V = I × R."]},
+"series-and-parallel":{cap:"One path, or two",svg:SV(520,200,"A series circuit and a parallel circuit",
+  P_("M30 94V50H70")+P_("M110 50H140")+P_("M180 50H210V150H30V106")+cell(30,100)+R_(70,43,40,14)+R_(140,43,40,14)+T_(90,34,"R1","middle")+T_(160,34,"R2","middle")+T_(120,185,"Series: same current in both","middle","m")+
+  P_("M300 94V50H470V80")+P_("M470 120V150H300V106")+P_("M400 50V80")+P_("M400 120V150")+cell(300,100)+R_(393,80,14,40)+R_(463,80,14,40)+dot(400,50)+dot(400,150)+T_(386,104,"R1","end")+T_(456,104,"R2","end")+T_(395,185,"Parallel: same voltage on both","middle","m")),
+ steps:["Left: the current has only one path, through R1 then R2. The supply voltage is shared between them.","Right: at the first dot the current splits. Part goes through R1, part through R2, and they rejoin at the second dot.","In the parallel circuit each resistor is connected straight across the cell, so each sees the full voltage.","Remove R1 on the left and everything stops. Remove R1 on the right and R2 carries on."]},
+"three-phase":{cap:"Star connection: 415 V between lines, 240 V to neutral",svg:SV(440,230,"Three windings in star",
+  P_("M220 120V30","w r")+P_("M220 120L120 190","w y")+P_("M220 120L320 190","w b")+P_("M220 120H400")+
+  R_(213,55,14,40,"w r f")+`<g transform="rotate(55 170 155)">`+R_(163,135,14,40,"w y f")+"</g>"+`<g transform="rotate(-55 270 155)">`+R_(263,135,14,40,"w b f")+"</g>"+
+  dot(220,120)+dot(220,30)+dot(120,190)+dot(320,190)+P_("M208 36L126 178","w thin dash")+P_("M232 36V108","w thin dash")+
+  T_(220,20,"R","middle","bold")+T_(104,206,"Y","middle","bold")+T_(336,206,"B","middle","bold")+T_(408,124,"N","start","bold")+T_(150,100,"415 V","end")+T_(240,78,"240 V")+T_(238,114,"star point","start","m")),
+ steps:["Three windings meet at the star point in the centre. The neutral wire N comes from there.","From any line terminal to N you measure the phase voltage, about 240 V.","Between any two line terminals you measure the line voltage, 415 V, which is √3 times 240 V.","With equal loads on all three phases the currents cancel at the star point and the neutral carries nothing."]},
+"power-factor":{cap:"A capacitor bank supplies the reactive power locally",svg:SV(460,200,"Motor and capacitor bank on one busbar",
+  P_("M30 40H430","w thick")+P_("M180 40V110")+motorS(180,130)+P_("M320 40V106")+P_("M308 106H332M308 114H332")+P_("M320 114V150")+dot(180,40)+dot(320,40)+
+  P_("M304 104C268 66 232 66 198 112","w acc dash")+T_(30,28,"415 V busbar, from the transformer")+T_(250,62,"kVAr","middle","bold")+T_(100,60,"kW","middle","bold")+T_(100,76,"from the supply","middle","m")+T_(180,172,"Motor","middle")+T_(320,172,"Capacitor bank","middle")),
+ steps:["The motor needs two things: kW to do the work and kVAr to make its magnetic field.","Without the capacitor, both come all the way from the transformer, so every cable on the way carries extra current.","The capacitor bank supplies the kVAr right beside the motor (dashed path).","Now the supply delivers little more than the kW. Current, cable losses and kVA demand all fall."]},
+"transformers":{cap:"Two coils on one iron core",svg:SV(460,200,"Transformer with primary and secondary windings",
+  P_("M190 50a10 10 0 0 1 0 20a10 10 0 0 1 0 20a10 10 0 0 1 0 20a10 10 0 0 1 0 20a10 10 0 0 1 0 20")+P_("M270 70a10 10 0 0 0 0 20a10 10 0 0 0 0 20a10 10 0 0 0 0 20","w thick")+
+  P_("M226 40V160M234 40V160")+P_("M190 50H110M190 150H110")+P_("M270 70H350M270 130H350","w thick")+
+  T_(100,98,"11 kV","end","bold")+T_(100,114,"many turns","end","m")+T_(360,98,"433 V","start","bold")+T_(360,114,"few turns","start","m")+T_(230,182,"iron core","middle","m")+T_(150,34,"Primary","middle")+T_(310,54,"Secondary","middle")),
+ steps:["AC in the primary coil (left) magnetises the iron core, first one way and then the other.","That changing magnetism passes through the secondary coil (right) and induces a voltage in it.","Fewer turns on the secondary gives a lower voltage. The ratio of turns sets the ratio of voltages.","The secondary is drawn thicker because it carries the larger current."]},
+"induction-motors":{cap:"The motor terminal box: star links and delta links",svg:SV(480,200,"Terminal box connections for star and delta",
+  [0,250].map((o,k)=>R_(35+o,38,150,104,"w")+[60,110,160].map((x,i)=>dot(x+o,62)+dot(x+o,118)+T_(x+o,54,["W2","U2","V2"][i],"middle","sm")+T_(x+o+7,134,["U1","V1","W1"][i],"start","sm")+P_(`M${x+o} 118V172`,"w "+"ryb"[i])+T_(x+o,188,"RYB"[i],"middle","bold")).join("")+
+   (k?[60,110,160].map(x=>P_(`M${x+o} 62V118`,"w thick acc")).join(""):P_(`M${60+o} 62H${160+o}`,"w thick acc"))+T_(110+o,26,k?"Delta (Δ)":"Star (Y)","middle","bold")).join("")),
+ steps:["A motor has three windings and six ends: U1-U2, V1-V2 and W1-W2. The terminal box lays them out so that flat links fit straight across.","Star: one link joins W2, U2 and V2 together. Each winding gets about 240 V.","Delta: three links join U1-W2, V1-U2 and W1-V2. Each winding gets the full 415 V.","The nameplate says which to use. A star-delta starter makes these same two connections with contactors instead of links."]},
+"motor-starters":{cap:"DOL starter power circuit, drawn as a single line",svg:SV(480,320,"Breaker, contactor, overload relay and motor in a line",
+  P_("M120 16V58")+P_("M112 36l16 -8M112 42l16 -8M112 48l16 -8","w thin")+noV(120,70)+xS(120,58)+P_("M120 82V128")+noV(120,140)+P_("M120 152V190")+R_(106,190,28,30)+P_("M113 211h5v-12h5v12h5","w thin")+P_("M120 220V265")+motorS(120,285)+
+  T_(136,20,"L1 L2 L3, 415 V")+T_(150,68,"Q1 breaker","start","bold")+T_(150,84,"isolates, and trips on a short circuit","start","m")+T_(150,138,"K1 contactor","start","bold")+T_(150,154,"switches the motor on and off","start","m")+T_(150,203,"F1 overload relay","start","bold")+T_(150,219,"drops K1 if current stays too high","start","m")+T_(150,289,"M1 motor","start","bold")),
+ steps:["Read from top to bottom. One line stands for all three phases. The three short strokes near the top say so.","Q1, the breaker, lets you isolate the starter and opens instantly on a short circuit.","K1, the contactor, is closed by the control circuit when START is pressed.","F1, the overload relay, measures the motor current. If it stays above the setting, F1 opens a contact in the control circuit and K1 drops out.","A star-delta starter adds two more contactors, Star and Delta, on the motor's other three terminals."]},
+"vfd":{cap:"Inside a drive: AC to DC and back to AC",svg:SV(520,150,"Rectifier, DC bus, inverter and motor",
+  P_("M20 70H90M190 70H220M310 70H340M440 70H464")+R_(90,40,100,60)+R_(220,40,90,60)+R_(340,40,100,60)+motorS(485,70)+
+  T_(20,58,"50 Hz in")+T_(140,66,"Rectifier","middle","bold")+T_(140,84,"AC → DC","middle","m")+T_(265,66,"DC bus","middle","bold")+T_(265,84,"capacitors","middle","m")+T_(390,66,"Inverter","middle","bold")+T_(390,84,"DC → AC","middle","m")+T_(390,120,"any frequency out","middle","m")),
+ steps:["The fixed 50 Hz supply enters on the left.","The rectifier, made of diodes, turns the AC into DC.","Capacitors on the DC bus smooth and store that DC. They stay charged for minutes after power-off, which is why every drive carries a wait-before-opening warning.","The inverter uses fast transistor switches (IGBTs) to chop the DC into pulses that form AC at whatever frequency is asked for.","The motor simply follows that frequency."]},
+"contactors-and-control":{cap:"Start-stop control circuit with a holding contact",svg:SV(440,380,"Control circuit: stop, overload, start in parallel with holding contact, coil",
+  P_("M60 20H330M60 360H330","w thick")+P_("M130 20V58")+ncV(130,70)+pbS(130,70)+P_("M130 82V118")+ncV(130,130)+P_("M130 142V193")+noV(130,205)+pbS(130,205)+P_("M130 217V286")+coilS(130,295)+P_("M130 304V360")+
+  P_("M130 165H230V193")+noV(230,205)+P_("M230 217V245H130")+dot(130,165)+dot(130,245)+dot(130,20)+dot(130,360)+
+  T_(340,24,"L")+T_(340,364,"N")+T_(152,68,"S0 Stop","start","bold")+T_(152,84,"normally closed","start","m")+T_(152,128,"F1 overload contact","start","bold")+T_(152,144,"normally closed","start","m")+T_(100,203,"S1 Start","end","bold")+T_(100,219,"normally open","end","m")+T_(248,203,"K1 13-14","start","bold")+T_(248,219,"holding contact","start","m")+T_(152,293,"K1 coil","start","bold")+T_(152,309,"A1-A2","start","m")),
+ steps:["Read from L at the top to N at the bottom. The coil K1 energises only when there is an unbroken path down to it.","S0 (Stop) and F1 (overload) are normally closed, so at rest they let current pass.","S1 (Start) is normally open. Press it and the path is complete: K1 energises and the motor contactor closes.","K1's own contact 13-14, drawn beside S1, closes too. It bypasses S1, so K1 stays on after you let go.","Press S0, or let F1 trip, and the path breaks. K1 drops, 13-14 opens, and only a new press of S1 will restart the motor."]},
+"earthing":{cap:"The path a fault current takes",svg:SV(480,220,"Earth fault loop from source to motor body and back",
+  C_(60,90,13)+T_(60,95,"~","middle","bold")+P_("M60 77V40H135M165 40H338")+R_(135,31,30,18)+T_(150,44,"Q1","middle","sm")+R_(320,30,110,82,"w")+R_(338,33,30,14)+P_("M360 47l6 14h-9l6 16","w bad")+
+  P_("M375 112V180H60V103","w live")+P_("M217 180V188","w live")+earthS(217,188)+dot(375,112)+
+  T_(80,95,"source","start","m")+T_(245,32,"phase conductor","middle")+T_(375,22,"motor body (metal)","middle")+T_(378,80,"fault","start","m")+T_(217,172,"earth conductor","middle")),
+ steps:["Normally current flows out on the phase conductor, through the winding and back on the other phases. The earth conductor carries nothing.","An insulation fault (red) lets the live winding touch the metal body.","Because the body is bonded to earth, a large current rushes back to the source along the earth conductor (green).","That current trips breaker Q1 in a fraction of a second. The body never stays live.","Take the earth conductor away and there is no return path and no trip. The body sits at 240 V until someone touches it."]},
+"plc-and-sensors":{cap:"How field devices connect to a PLC",svg:SV(520,220,"Sensor and push-button into PLC inputs, output to contactor coil",
+  P_("M40 40V185M480 40V185","w thick")+R_(200,40,120,145)+P_("M40 80H90M140 80H200")+R_(90,70,50,20)+P_("M40 130H100")+P_("M100 130L125 117")+P_("M128 130H200")+dot(100,130)+dot(128,130)+P_("M320 80H380M408 80H480")+R_(380,71,28,18)+
+  T_(40,30,"+24 V","middle","bold")+T_(480,30,"0 V","middle","bold")+T_(206,84,"I0.0")+T_(206,134,"I0.1")+T_(314,84,"Q0.0","end")+T_(260,150,"PLC","middle","bold")+T_(260,166,"program","middle","m")+T_(115,62,"B1 sensor","middle")+T_(114,108,"S1 start","middle")+T_(394,62,"K1 coil","middle")),
+ steps:["Everything here runs on 24 V DC: the +24 V rail on the left and 0 V on the right.","When sensor B1 detects its target it passes +24 V to input I0.0, and that input's LED lights.","The program reads the inputs and decides. For example: if I0.0 and I0.1 are both on, switch on Q0.0.","Output Q0.0 sends 24 V to the coil of contactor K1, which starts the motor in the power circuit.","Fault-finding follows the same chain: sensor LED, input LED, output LED, contactor."]},
+"reading-drawings":{cap:"The symbols you will meet most",svg:'<div class="legend">'+[
+  [P_("M45 8V23M45 47V62")+noV(45,35),"NO contact"],
+  [P_("M45 8V23M45 47V62")+ncV(45,35),"NC contact"],
+  [P_("M45 8V23M45 47V62")+noV(45,35)+pbS(45,35),"Push-button"],
+  [P_("M45 8V26M45 44V62")+coilS(45,35),"Coil"],
+  [P_("M45 8V23M45 47V62")+noV(45,35)+xS(45,23),"Circuit breaker"],
+  [R_(39,20,12,30)+P_("M45 8V62"),"Fuse"],
+  [P_("M45 8V23M45 47V62")+R_(31,23,28,24)+P_("M38 41h5v-12h5v12h5","w thin"),"Overload relay"],
+  [P_("M45 8V16")+C_(45,36,19)+T_(45,38,"M","middle","bold")+T_(45,50,"3~","middle","sm"),"Motor"],
+  [P_("M45 6V15M45 55V64")+C_(45,27,12,"w")+C_(45,43,12,"w"),"Transformer"],
+  [P_("M45 8V23M45 47V62")+lampS(45,35),"Indicator lamp"],
+  [P_("M45 10V40")+earthS(45,40),"Earth"]].map(x=>mini(x[0],x[1])).join("")+"</div>",
+ steps:["A contact drawn with the lever away from the wire is normally open (NO). A lever crossing a small bar is normally closed (NC).","A small T-shaped handle beside a contact means a person operates it: a push-button.","A rectangle on the wire is a coil. When it is energised, every contact with the same tag changes state.","A cross on a contact marks a circuit breaker. A square pulse inside a box marks a thermal overload.","Find these on a real drawing and say out loud what each one does. That is how the symbols stick."]}
+};
+
+/* ---------- deeper explanation, worked example, common mistake ---------- */
+const X={
+"safety-loto":["Shock severity depends on how much current passes through the body, the path it takes and for how long. A path across the chest is the dangerous one, so never let your body bridge two points. The second hazard is arc flash: a short circuit inside a panel releases intense heat and light, which is why panel doors stay closed and only authorised people operate large breakers.","Job: change a conveyor roller. Stop the conveyor at the operator station. Open isolator Q1 at the MCC. Fit your padlock and tag. Press START at the machine to confirm nothing moves. Test for voltage at the motor terminals with a proven meter. Only then begin.","Using the emergency stop or a control switch as isolation. Those only interrupt the control circuit. The power circuit is still connected, and a fault or another person can re-energise it."],
+"what-is-electricity":["Individual electrons drift slowly, a fraction of a millimetre each second. The effect is fast because the wire is already full of electrons: push one in at one end and one moves out at the other almost at once, like a pipe full of marbles. By convention, drawings show current flowing from positive to negative, which is opposite to the electrons' real drift. Everyone uses the conventional direction.","A torch: cell (source), metal strip (conductor), switch, bulb (load), spring back to the cell. Slide the switch off and you open one gap. The bulb goes out even though the cell is still full of energy.","Thinking one wire to a load is enough. Current needs a way out and a way back. One wire with no return is an open circuit and nothing flows."],
+"voltage-current-resistance":["Resistance depends on the material, the length and the thickness of a conductor. A long thin cable has more resistance than a short thick one, so it loses more voltage along the way and runs hotter for the same current. That is why cable sizes go up with current and with distance. Voltage is always measured between two points. A single point has no voltage by itself.","A 24 V indicator lamp has a resistance of 480 Ω. I = V ÷ R = 24 ÷ 480 = 0.05 A, which is 50 mA. If the supply sags to 20 V, the current falls to 20 ÷ 480 = 42 mA and the lamp is dimmer.","Mixing up units. 50 mA is 0.05 A and 4.7 kΩ is 4700 Ω. Convert everything to volts, amps and ohms before using the formula."],
+"series-and-parallel":["Two rules solve any circuit. Round a series loop, the voltages across the parts add up to the supply voltage. At any junction, the current flowing in equals the current flowing out. These are Kirchhoff's laws, and together with Ohm's law they are all you need for DC circuits.","24 V across 20 Ω and 30 Ω. In series: R = 50 Ω, I = 0.48 A, and the voltages are 9.6 V and 14.4 V. In parallel: the currents are 1.2 A and 0.8 A, total 2.0 A, so the combined resistance is 24 ÷ 2 = 12 Ω.","Assuming more resistors always means more resistance. Adding a resistor in parallel always lowers the total, because it opens another path."],
+"power-and-energy":["In a resistor all the power turns into heat: P = I² × R. Double the current and the heating is four times as much. This is why a loose or corroded joint, which has extra resistance, gets hot and eventually burns. For a three-phase motor, electrical power in is √3 × V × I × PF. The kW on the nameplate is the mechanical power out at the shaft, which is a little less because no motor is 100% efficient.","A motor draws 60 kW from the supply for 20 hours a day. Energy = 60 × 20 = 1200 kWh a day. At ₹8 a unit that is ₹9600 a day. Cutting idle running by 2 hours saves 120 kWh, or ₹960, every day.","Saying a machine uses '75 kW per hour'. kW is already a rate. The machine uses 75 kWh in each hour it runs at that load."],
+"ac-and-dc":["An AC voltage is always changing, so we quote its RMS value: the DC voltage that would give the same heating. A 230 V supply actually peaks at about 325 V (230 × √2). Meters read RMS. DC is made from AC by a rectifier, and that is the job of the 24 V power supply unit in every control panel.","Frequency 50 Hz means one cycle takes 1 ÷ 50 = 0.02 s, or 20 ms. The voltage passes through zero twice in each cycle, so 100 times a second.","Using the DC range of a meter on an AC circuit, or the other way round. The reading is close to zero and you may wrongly decide the circuit is dead."],
+"magnetism-and-induction":["The induced voltage always acts to oppose the change that caused it. This is Lenz's law. Push a magnet into a coil and the coil pushes back. It is why a coil resists any change in its current, a property called inductance. It also explains the voltage spike when a contactor coil is switched off: the collapsing field tries to keep the current going. Suppressors fitted across coils absorb that spike.","A coil of 200 turns gives a certain voltage when a magnet passes. With 400 turns at the same speed the voltage doubles. Pass the magnet twice as fast and it doubles again.","Expecting a voltage from a strong magnet that is not moving. Strength alone does nothing. Only change induces."],
+"three-phase":["Loads can be connected in star (Y) or delta (Δ). In star, one end of each winding joins a common point and each winding sees the phase voltage, 240 V. In delta the windings form a triangle and each sees the full line voltage, 415 V. When the three currents are equal they cancel at the star point and the neutral carries nothing. Unequal single-phase loads leave a current in the neutral.","A motor draws 100 A at 415 V with a power factor of 0.85. P = √3 × 415 × 100 × 0.85 = 61 100 W, so about 61 kW of electrical input.","Measuring 240 V on one phase and deciding the supply is healthy. A motor needs all three. Check R-Y, Y-B and B-R. Each should read about 415 V."],
+"power-factor":["In a motor the current wave lags behind the voltage wave, because the windings are coils. Power factor is the cosine of that lag angle. A capacitor does the opposite: its current leads. Put a capacitor beside a motor and the reactive current passes back and forth between the two instead of travelling from the supply. Lightly loaded motors have the worst power factor, because the magnetising current stays the same while the working current falls.","400 kW at a power factor of 0.75 needs 533 kVA and carries 353 kVAr. To reach 0.95 the kVAr must fall to 131. Capacitors needed: 353 − 131 = about 220 kVAr. The current at 415 V falls from 742 A to 586 A.","Thinking capacitors reduce the kW a machine uses. They do not. They reduce the current and kVA drawn from the supply, which cuts losses and penalties."],
+"transformers":["A transformer is rated in kVA, not kW, because its heating depends on voltage and current whatever the power factor of the load. It has two kinds of loss. Core loss is there whenever it is energised. Copper loss rises with the square of the load current. In oil-filled transformers the oil both insulates and cools. A tap changer adjusts the turns ratio slightly to correct the output voltage.","A 1000 kVA, 11 kV / 433 V transformer. Full-load secondary current = 1 000 000 ÷ (√3 × 433) = 1333 A. Primary current = 1 000 000 ÷ (√3 × 11 000) = about 52 A.","Treating the low-voltage side as the safe side. It carries the higher current and a far larger fault current."],
+"induction-motors":["Torque comes from slip. At no load the slip is tiny and the motor draws mainly magnetising current. As the load rises the rotor slows a little, more current is induced, and the torque rises to match. Push past the maximum torque and the motor stalls and draws starting current. The nameplate also tells you the connection: '415 V Δ' means the windings are made for 415 V each and must be linked in delta on a 415 V supply.","Nameplate: 1470 rpm, 50 Hz. The nearest synchronous speed above that is 1500 rpm, so it is a 4-pole motor. Slip = (1500 − 1470) ÷ 1500 = 2%.","Judging the load by sound or touch. Measure the current in all three phases and compare with the nameplate. Unequal phase currents are a warning in themselves."],
+"motor-starters":["Why is starting current so high? At standstill the slip is 100%, so the rotor behaves like the short-circuited secondary of a transformer. As the motor gathers speed the current falls. In a star-delta starter the changeover must happen when the motor is near full speed. To use star-delta, a motor must have all six winding ends brought out and be rated for delta at the supply voltage.","A 75 kW motor with a full load current of 140 A. DOL start: about 6 × 140 = 840 A. Star-delta start: about 840 ÷ 3 = 280 A. Starting torque also falls to one third.","Setting the star-delta timer too short. The motor is still slow at changeover, the current surge returns and the breaker may trip."],
+"vfd":["A drive keeps the ratio of voltage to frequency constant. At 25 Hz it gives about half the voltage, so the magnetic field in the motor stays the same and full torque is available. Above 50 Hz the voltage cannot rise any further, so torque falls. The output is a rapid train of pulses, not a smooth wave, and the motor windings smooth it into a near-sine current. At very low speed the motor's own fan cools poorly, so some motors have a separate cooling fan.","A 4-pole motor at 35 Hz: field speed = 120 × 35 ÷ 4 = 1050 rpm. Output voltage is about 415 × 35 ÷ 50 = 290 V. A fan at this speed needs 0.7 × 0.7 × 0.7 = 34% of full power.","Opening a contactor or isolator between the drive and the motor while it is running. That can damage the drive. Stop the drive first."],
+"breakers-and-fuses":["Protection is graded so that the device nearest the fault trips first and the rest of the plant keeps running. This is called discrimination. Every breaker also has a breaking capacity in kA, the largest fault current it can safely interrupt. Close to a big transformer the fault current is very high, so the kA rating matters as much as the amp rating. The overload relay is set to the motor's full load current.","A motor with a full load current of 28 A: set the overload relay to 28 A. Choose a breaker or fuse above that which lets the starting current of about 170 A pass for a few seconds but opens instantly on a short circuit.","Fitting a bigger fuse or breaker because the old one 'keeps tripping'. The cable is now unprotected and becomes the fuse."],
+"contactors-and-control":["Contactor terminals follow a standard. The main contacts are 1-2, 3-4 and 5-6. The coil is A1-A2. An auxiliary contact numbered 13-14 is normally open and one numbered 21-22 is normally closed. To run a motor in both directions, two contactors swap two phases, and each one's NC auxiliary contact is wired into the other's coil circuit. That interlock stops both closing together and short-circuiting the supply.","Follow the diagram. Press S1: current flows L, S0, F1, S1, coil K1, N. K1 closes its 13-14 contact. Release S1: the current now flows through 13-14 instead. Press S0: the path opens, K1 drops, 13-14 opens and the circuit is back at rest.","Confusing the coil voltage with the motor voltage. A contactor switching a 415 V motor may have a 24 V DC, 110 V AC or 230 V AC coil. Read the coil label before you replace one."],
+"earthing":["For the breaker to trip quickly the fault current must be large, and that needs a low resistance all the way round the earth loop. A loose or corroded earth joint can leave a body at a dangerous voltage without tripping anything, which is why earth continuity and earth pit resistance are tested on a schedule. A residual current device adds a second layer: it compares the current going out with the current coming back and trips if a little is leaking to earth.","Phase-to-earth voltage 240 V, earth loop resistance 0.5 Ω. Fault current = 240 ÷ 0.5 = 480 A, enough to trip a 32 A breaker at once. A bad joint adding 10 Ω cuts that to 23 A, and the breaker may never trip.","Using the neutral as an earth, or linking the two at a machine. A broken neutral would then make every metal body live."],
+"plc-and-sensors":["Signals come in two kinds. A digital signal is on or off: a proximity switch, a push-button. An analog signal varies, most often as 4 to 20 mA, where 4 mA is the bottom of the range and 20 mA the top. Starting at 4 mA instead of zero means a broken wire, which gives 0 mA, shows up as a fault. Three-wire sensors are PNP or NPN. A PNP sensor switches +24 V to the input.","A pressure transmitter is ranged 0 to 10 bar for 4 to 20 mA and its signal is 12 mA. That is (12 − 4) ÷ 16 = 50% of the range, so the pressure is 5 bar.","Blaming the PLC program first. Programs rarely change by themselves. Check the field device, its wiring and the input LED before suspecting the logic."],
+"reading-drawings":["Drawings use a page and column grid. A cross-reference such as /12.4 beside a contact means its coil is on page 12, column 4. Under each coil there is usually a small table listing where its contacts are used. A wire keeps the same number until it passes through a device. Terminal strips are tagged X1, X2 and so on, and that is where the field cables land.","The motor will not start and K1 is not pulling in. The drawing shows K1's coil fed through S0, F1 and S1. With a technician, and the circuit live, measure the voltage after each device in turn. The device where the voltage disappears is the open point.","Reading a contact as it looks in a running machine. The drawing shows everything with the power off and nothing pressed."],
+"multimeter":["A voltmeter has a very high internal resistance, so connecting it across a circuit draws almost nothing. An ammeter has almost none, so it must go in series. Put across a supply it is a short circuit. That is why the current sockets on a meter are fused, and why plant work uses a clamp meter. Insulation resistance needs a separate tester that works at 500 V or 1000 V, because a multimeter's small test voltage cannot stress the insulation.","Checking a control fuse on a live 24 V circuit: measure from 0 V to the supply side of the fuse and read 24 V. Measure from 0 V to the load side and read 0 V. The fuse is open. Isolate, then confirm with the continuity range.","Leaving the red lead in the amps socket and then measuring voltage. The meter becomes a short circuit across the supply. Check the lead positions every single time."],
+"fault-finding":["On a long chain the fastest method is half-splitting: measure in the middle. If the signal is there, the fault is downstream. If not, it is upstream. Each measurement halves the search. Separate two questions early: is the power there, and is the command there? A motor that hums but does not turn has power on only some phases or is jammed. That is a power or mechanical fault, not a control fault.","A motor does not run. The contactor pulls in when START is pressed, so the control circuit is fine. At the contactor output you measure 415 V on R-Y and 0 V on Y-B. One pole is not passing: a blown fuse or a burnt contact on the B phase.","Changing several things at once. If the machine then runs you do not know what fixed it, and the real cause may still be there."]};
+
+
+Object.assign(F,{
+"capacitors-and-inductors":"Find the discharge-time warning label on an APFC panel or a drive and read how long it says to wait.",
+"other-motors-and-generators":"Find one servo motor and the DG set nameplate. Note the rated speed of each.",
+"power-electronics":"Find a drive's cooling fan and the panel air filter. See whether the filter is clean.",
+"plant-power-distribution":"Find out which loads in your area are on the DG and which are on UPS.",
+"cables-and-terminations":"Read the marking printed on one power cable: number of cores, size in sq mm and insulation type.",
+"switchgear-and-protection-relays":"On an HT or main LT panel, find the protection relay and read which fault indications it can show.",
+"power-quality":"On a multifunction meter, read the three phase voltages and see how closely they agree. Look for a THD reading.",
+"machine-safety-circuits":"On one machine, find every emergency stop, guard switch and light curtain, then the safety relay in the panel.",
+"instrumentation-and-control-loops":"Find one temperature or pressure loop. Identify its sensor, its controller and the valve or heater it adjusts.",
+"hmi-scada-and-networks":"On one HMI, open the alarm history. Find the last three alarms and when they happened.",
+"maintenance-and-testing":"Join one preventive maintenance round. Note three checks the technician makes on a motor or a panel.",
+"energy-and-efficiency":"During a break or changeover, list which motors, fans or compressors in your area keep running with no product.",
+"standards-and-permits":"Ask to see a completed permit to work. Find where it records the isolation and who signed it."});
+
+Object.assign(D,{
+"plant-power-distribution":{cap:"A typical plant single line diagram",svg:SV(520,310,"Grid and DG incomers feeding a busbar with outgoing feeders",
+  P_("M120 24V50")+noV(120,62)+xS(120,50)+P_("M120 74V96")+C_(120,108,12,"w")+C_(120,124,12,"w")+P_("M120 136V158")+noV(120,170)+xS(120,158)+P_("M120 182V200")+
+  C_(330,108,16)+T_(330,113,"G","middle","bold")+P_("M330 124V158")+noV(330,170)+xS(330,158)+P_("M330 182V200")+P_("M134 170H316","w thin dash")+
+  P_("M60 200H470","w thick")+[[100,"MCC 1"],[220,"MCC 2"],[340,"APFC"],[440,"UPS"]].map(f=>P_(`M${f[0]} 200V236`)+R_(f[0]-36,236,72,28)+T_(f[0],255,f[1],"middle")).join("")+P_("M440 264V280")+
+  T_(120,16,"Grid, 33 kV","middle")+T_(140,66,"VCB")+T_(140,120,"Transformer")+T_(140,150,"ACB")+T_(330,84,"DG set","middle")+T_(350,150,"ACB")+T_(225,164,"interlock","middle","m")+T_(470,192,"PCC busbar, 433 V","end","m")+T_(440,296,"PLC, controls","middle","m")),
+ steps:["Left incomer: grid supply, HT breaker (VCB), transformer, then an ACB onto the main busbar.","Right incomer: the DG set with its own ACB onto the same busbar.","The dashed interlock stops both ACBs being closed together, unless the system is designed to synchronise them.","The thick line is the PCC busbar. Feeders leave it for each MCC, the APFC panel and the UPS.","The UPS feeds the loads that must never lose power, even for a second."]},
+"switchgear-and-protection-relays":{cap:"CT, relay and breaker working together",svg:SV(480,200,"Current transformer feeding a relay that trips a breaker",
+  P_("M30 60H125")+P_("M125 60L152 45")+P_("M155 60H450")+xS(155,60)+dot(125,60)+C_(290,60,13,"w")+P_("M290 73V120")+R_(245,120,90,42)+P_("M245 141H140V72","w bad dash")+
+  T_(30,50,"Supply")+T_(450,50,"Load","end")+T_(140,32,"Breaker","middle","bold")+T_(290,36,"CT 800/5","middle","bold")+T_(290,138,"Protection","middle")+T_(290,154,"relay","middle")+T_(190,134,"trip","middle","m")+T_(300,100,"0 to 5 A")),
+ steps:["Load current flows left to right through the breaker and through the centre of the CT.","The CT sends a small copy of that current, up to 5 A, down to the relay.","The relay compares it with its settings: how much current, for how long.","If the limit is passed, the relay energises the breaker's trip coil (dashed red) and the breaker opens.","The relay then holds an indication of what it saw. Read it before resetting."]},
+"machine-safety-circuits":{cap:"Dual-channel safety circuit",svg:SV(520,200,"Emergency stop and guard switch into a safety relay driving two contactors",
+  R_(30,40,90,36)+R_(30,110,90,36)+P_("M120 52H210M120 64H210M120 122H210M120 134H210")+R_(210,34,110,112)+P_("M320 70H380M320 116H380")+R_(380,58,50,24)+R_(380,104,50,24)+P_("M405 128V172H265V146","w thin dash")+
+  T_(75,63,"E-stop","middle")+T_(75,133,"Guard switch","middle")+T_(265,86,"Safety","middle","bold")+T_(265,102,"relay","middle","bold")+T_(405,75,"K1","middle")+T_(405,121,"K2","middle")+T_(165,46,"2 channels","middle","sm")+T_(165,116,"2 channels","middle","sm")+T_(440,90,"contacts in","start","m")+T_(440,104,"series to","start","m")+T_(440,118,"the motor","start","m")+T_(335,188,"feedback: have both dropped out?","middle","m")),
+ steps:["Each safety device has two separate contacts and two separate wires to the safety relay.","The relay only switches on when both channels of every device are healthy and it has been reset.","Its two outputs hold in contactors K1 and K2, whose main contacts are in series in the motor circuit.","Open any device and both contactors drop. If one has welded, the other still stops the motor.","The dashed feedback loop lets the relay check that K1 and K2 have both opened before it permits a restart."]},
+"instrumentation-and-control-loops":{cap:"A closed control loop",svg:SV(520,170,"Transmitter, controller and control valve around a process",
+  R_(40,50,110,50)+R_(205,50,110,50)+R_(370,50,110,50)+P_("M150 75H205M315 75H370M260 20V50")+P_("M425 100V142H95V100","w acc dash")+
+  T_(95,72,"Transmitter","middle","bold")+T_(95,88,"measures","middle","m")+T_(260,72,"Controller","middle","bold")+T_(260,88,"compares","middle","m")+T_(425,72,"Control valve","middle","bold")+T_(425,88,"corrects","middle","m")+T_(178,68,"4-20","middle","sm")+T_(342,68,"4-20","middle","sm")+T_(268,30,"setpoint")+T_(260,160,"the process: temperature, pressure or flow","middle","m")),
+ steps:["The transmitter measures the process and sends the value to the controller as 4 to 20 mA.","The controller compares that value with the setpoint coming in from the top.","It sends a 4 to 20 mA command to the control valve to open or close a little.","The valve changes the process (dashed path), the transmitter sees the change, and the loop goes round again, many times a second."]}
+});
+
+Object.assign(X,{
+"capacitors-and-inductors":["Why the time shift? A capacitor's current is largest when its voltage is changing fastest, which is as the voltage passes through zero. So its current peaks a quarter of a cycle before the voltage. An inductor's voltage is largest when its current is changing fastest, so its current peaks a quarter of a cycle after. Because the two are opposite, one can cancel the other, and that is power factor correction. At one particular frequency XL equals XC. This is resonance, and it causes trouble when capacitor banks meet harmonics.","A 100 mH coil at 50 Hz: XL = 2 × 3.14 × 50 × 0.1 = 31.4 Ω. A 100 µF capacitor at 50 Hz: XC = 1 ÷ (2 × 3.14 × 50 × 0.0001) = 31.8 Ω.","Measuring a coil's resistance with a multimeter and using it to predict the AC current. On AC the coil's reactance adds to its resistance, so the real current is much lower."],
+"other-motors-and-generators":["A servo system is a closed loop. The drive compares where the axis is, from the encoder, with where it should be, thousands of times a second, and corrects the difference. That gives repeatable positioning. A generator running alone must match the load moment by moment. When load rises the engine slows slightly, the governor adds fuel to restore 50 Hz, and the AVR raises the field current to restore voltage. To connect a generator to a live busbar, its voltage, frequency and phase must match first. That is synchronising.","A DG alternator has 4 poles. For 50 Hz it must turn at 120 × 50 ÷ 4 = 1500 rpm. If a sudden load pulls the engine down to 1470 rpm, the frequency dips to 4 × 1470 ÷ 120 = 49 Hz until the governor recovers.","Replacing a servo motor without setting up its encoder and parameters. The drive must know the motor and its feedback, or it will fault."],
+"power-electronics":["Electronic switches are efficient because they are either fully on, with almost no voltage across them, or fully off, with no current through them. Either way little power is lost in the switch. The losses come in the brief moments of switching and appear as heat, which is why drives have heatsinks and fans. Fast switching also makes the supply current flow in pulses. Those distortions are harmonics, covered in the power quality lesson.","A single-phase bridge rectifier on 230 V with a smoothing capacitor charges to the peak: 230 × √2 = about 325 V DC. A drive on a 415 V three-phase supply has a DC bus of roughly 415 × 1.35 = 560 V.","Assuming a drive or UPS is dead because its display is off. The DC bus capacitors stay charged for minutes. Wait the stated time, then measure the DC bus."],
+"plant-power-distribution":["Why step down in stages? For the same power, a higher voltage means a lower current, and the loss in a cable depends on the square of the current. So power travels at high voltage as far as possible and is stepped down close to where it is used. Grid and DG incomers are interlocked so that both cannot feed one busbar unless they are deliberately synchronised.","1000 kW at a power factor of 0.95. At 433 V the current is 1 000 000 ÷ (√3 × 433 × 0.95) = about 1400 A. At 11 kV it is about 55 A. The same power needs one twenty-fifth of the current.","Assuming a board is dead because the grid is off. The DG or a UPS may be feeding it from another direction. Always test."],
+"cables-and-terminations":["A joint is a resistance, and the heat it makes is I² × R. A slightly loose terminal has a little extra resistance. At high current that makes heat, heat oxidises the surfaces, the resistance rises further, and the joint runs away until it burns. This is why terminals are tightened to a stated torque and panels are scanned with a thermal camera. Aluminium needs extra care: it creeps under pressure and oxidises quickly, so it needs the correct lugs and jointing compound.","A motor draws 100 A through 150 m of 35 sq mm copper cable, about 0.52 Ω per km. Drop = √3 × 100 × 0.52 × 0.15 = 13.5 V, which is 3.3% of 415 V.","Choosing a cable by full load current alone. Also check voltage drop on long runs, derating for grouping and heat, and whether the cable survives the fault current until the breaker opens."],
+"switchgear-and-protection-relays":["Overcurrent relays commonly use an inverse-time curve: the larger the fault current, the faster the trip. A modest overload is tolerated for seconds and a heavy fault is cleared in a fraction of a second. Upstream relays are set a little slower than downstream ones so that only the nearest breaker opens. A CT acts as a current source and drives its secondary current through whatever is connected. If the secondary is open while the primary carries current, the voltage rises to a dangerous level. So CT secondaries are shorted before any meter or relay is removed.","A feeder has an 800/5 CT and carries 480 A. Relay current = 480 × 5 ÷ 800 = 3 A. If the relay is set to pick up at 5 A, it starts timing when the feeder current passes 800 A.","Resetting a tripped relay to get power back before recording what it showed. The indication is the only evidence of the kind of fault and the phase it was on."],
+"power-quality":["A drive's rectifier draws current only near the peaks of the voltage wave, in short pulses. Any repeating waveform can be built from a 50 Hz sine wave plus sine waves at multiples of 50 Hz. Those multiples are the harmonics. Common drives produce mainly the 5th, 7th, 11th and 13th. Capacitors oppose high frequencies less, so they attract harmonic current and overheat, and together with the supply's inductance they can resonate. A reactor in series with each capacitor step, called a detuned bank, prevents that.","Phase voltages are 410, 415 and 402 V. The average is 409 V and the largest deviation is 7 V. Unbalance = 7 ÷ 409 = 1.7%, enough to give clearly uneven motor currents and extra heating.","Adding plain capacitor banks to a plant full of drives. Without detuning reactors the capacitors can resonate with the supply and fail early."],
+"machine-safety-circuits":["The principle is fail-safe design with redundancy and monitoring. Redundancy means two channels and two contactors, so a single fault cannot remove the protection. Monitoring means the relay checks for faults on every cycle, so a hidden fault is found before a second one adds to it. Standards grade how reliable a safety function must be, as a Performance Level (PL a to e) or a Safety Integrity Level (SIL), based on how severe and how likely an injury is. An emergency stop is not isolation. After stopping, the machine still needs lockout before anyone works on it.","An operator opens a guard. Both channels of the guard switch open and the safety relay drops K1 and K2. K1's contacts have welded, but K2 opens and the motor stops. On reset, the relay sees through its feedback loop that K1 has not opened and refuses to restart. The fault has been found safely.","Bridging a guard switch to keep production running. It removes the protection for everyone who uses the machine after you."],
+"instrumentation-and-control-loops":["Current is used for signals because it is the same everywhere in a series loop, so cable length and resistance do not change the reading, and it resists electrical noise better than a voltage signal. Tuning a PID loop is a balance. With too little gain the loop is sluggish. With too much it overshoots and oscillates. Calibration means comparing an instrument with a known reference and adjusting it. It is done on a schedule because every sensor drifts.","An RTD transmitter is ranged 0 to 200 °C and sends 13.6 mA. Value = (13.6 − 4) ÷ 16 × 200 = 120 °C.","Retuning the PID when the real problem is mechanical. Check for a sticking valve, a blocked sensor pocket or a failed steam trap before touching the tuning."],
+"hmi-scada-and-networks":["Older fieldbuses such as Modbus RTU and Profibus use a twisted pair wired from device to device in a line, with a terminating resistor at each end. A missing terminator or a damaged shield causes intermittent faults that are hard to find. Ethernet-based networks such as Profinet, EtherNet/IP and Modbus TCP use switches and standard connectors, and are faster and easier to diagnose. Because these networks now link to office systems, security matters too.","A line stops with 'Station 7 bus fault'. Check in order: does station 7 have 24 V? Are its network LEDs on? Is the connector seated and the terminator switch right? Was anything replaced recently that might have the wrong address?","Plugging a personal laptop or USB drive into a machine network. That is how malware reaches plant controls."],
+"maintenance-and-testing":["Insulation ages with heat. A common rule of thumb is that every 10 °C above the rated temperature halves the insulation's life, so a clogged fan cover quietly shortens a motor's life. Insulation classes B, F and H state the temperature a winding can stand. An insulation resistance reading means most as a trend. One value says little, but a steady fall over months is a clear warning.","A winding reads 200 MΩ after 1 minute and 500 MΩ after 10 minutes. PI = 500 ÷ 200 = 2.5. A value of 2 or more is generally taken as healthy and dry. A value near 1 suggests moisture or contamination.","Over-greasing bearings. Too much grease overheats the bearing and can be forced into the windings."],
+"energy-and-efficiency":["A motor is most efficient at around 75 to 100% of its rated load. A lightly loaded motor runs at poor efficiency and poor power factor, so an oversized motor wastes energy every hour. Staggering the start of large machines keeps the demand peak down. An energy audit follows a simple order: measure, find the biggest users, remove waste such as idle running and leaks, then improve efficiency, and only then invest in new equipment. Always measure again afterwards to prove the saving.","A 75 kW motor at full load for 6000 hours a year. Old efficiency 91%, new 95%. Input falls from 75 ÷ 0.91 = 82.4 kW to 75 ÷ 0.95 = 78.9 kW. That saves about 3.5 kW, or 20 800 kWh a year: about ₹1.7 lakh at ₹8 a unit.","Fitting a drive to save energy on a load that always runs at full speed. The drive adds a few percent of loss and saves nothing."],
+"standards-and-permits":["The order of controls matters. Removing the hazard altogether is best. Isolating it is next. Engineering controls such as guards and interlocks follow, then procedures such as permits, and PPE comes last because it only limits injury once everything else has failed. Authorisation is formal too: only named, trained people may switch HT equipment or issue permits. As a trainee you observe and assist until your plant authorises you. Ask which regulations and standards your plant's procedures are based on, and read the procedures themselves.","Job: clean an HT transformer. The permit lists: HT breaker opened and racked out, earths applied on both sides, locks and tags fitted, voltage tested, area barricaded. Issuer and receiver both sign. When the job ends the receiver signs it back, the earths are removed, and only then is the breaker returned to service.","Treating a permit as paperwork to fill in afterwards. Its value is in the checks made before the work starts."]});
+
+/* ---------- state ---------- */
+let S={done:{},quiz:{},mis:{},road:{},notes:{},days:[],rx:0};
+try{const s=JSON.parse(localStorage.getItem("sfe-progress")||"null");if(s&&s.done&&s.quiz)S=Object.assign(S,s);}catch(e){}
+const save=()=>{try{localStorage.setItem("sfe-progress",JSON.stringify(S));}catch(e){}};
+const $=(s,r=document)=>r.querySelector(s);
+const main=$("#main"),rail=$("#rail"),jump=$("#jumpsel");
+let raf=0;
+const reduce=window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches;
+const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const fmt=(n,d=0)=>Number(n).toLocaleString("en-IN",{maximumFractionDigits:d,minimumFractionDigits:d});
+
+function xp(){let x=S.rx||0;for(const l of L){if(S.done[l.id])x+=20;if(S.mis[l.id])x+=10;const q=S.quiz[l.id]||[];x+=q.filter(v=>v===true).length*10;}return x;}
+const today=d=>(d||new Date()).toLocaleDateString("en-CA");
+function streak(){const d=new Date();let n=0;if(!S.days.includes(today(d)))d.setDate(d.getDate()-1);while(S.days.includes(today(d))){n++;d.setDate(d.getDate()-1);}return n;}
+function meter(){
+  const n=L.filter(l=>S.done[l.id]).length,x=xp();
+  $("#pcount").textContent=n+" / "+L.length;$("#xp").textContent=x+" XP";
+  $("#pbar").style.width=(n/L.length*100)+"%";
+  $("#rank").textContent=x>=1200?"Shop floor ready":x>=700?"Fault finder":x>=300?"Panel spotter":"New joiner";
+}
+function nav(cur){
+  let h=[["start","Start here"],["plan","My plan"],["review","Daily review"],["formulas","Formula sheet"],["glossary","Glossary"]].map(p=>'<a href="#'+p[0]+'" class="'+(cur===p[0]?"on":"")+'"><span class="dot"></span>'+p[1]+"</a>").join("");
+  MODS.forEach((m,i)=>{h+="<h3>"+m+"</h3>";L.filter(l=>l.m===i).forEach(l=>{
+    h+='<a href="#'+l.id+'" class="'+(S.done[l.id]?"done ":"")+(cur===l.id?"on":"")+'"><span class="dot"></span>'+l.t+"</a>";});});
+  rail.innerHTML=h;
+  jump.innerHTML='<option value="start">Start here</option><option value="plan">My plan</option><option value="review">Daily review</option><option value="formulas">Formula sheet</option><option value="glossary">Glossary</option>'+L.map((l,i)=>'<option value="'+l.id+'">'+(i+1)+". "+l.t+(S.done[l.id]?" ✓":"")+"</option>").join("");
+  jump.value=cur;
+}
+jump.addEventListener("change",()=>{go(jump.value);});
+
+/* ---------- widget helpers ---------- */
+const sl=(id,label,min,max,step,val)=>'<div class="ctrl"><label for="'+id+'">'+label+' <b id="'+id+'v"></b></label><input type="range" id="'+id+'" min="'+min+'" max="'+max+'" step="'+step+'" value="'+val+'"></div>';
+const out=(id,label)=>'<div class="out"><small>'+label+'</small><b id="'+id+'">-</b></div>';
+const val=id=>parseFloat($("#"+id).value);
+const set=(id,t)=>{$("#"+id).textContent=t;};
+function bind(el,fn){el.addEventListener("input",fn);el.addEventListener("click",e=>{if(e.target.closest("button"))fn(e);});fn();}
+function canvasSetup(c){const r=window.devicePixelRatio||1,w=c.clientWidth,h=c.clientHeight;c.width=w*r;c.height=h*r;const x=c.getContext("2d");x.setTransform(r,0,0,r,0,0);return{x,w,h};}
+
+const W={
+ohm(el){
+  el.innerHTML='<div class="ctrls">'+sl("oV","Voltage (pump pressure)",1,24,1,12)+sl("oR","Resistance (pipe narrowness)",1,100,1,24)+'</div><div class="outs">'+out("oI","Current")+out("oP","Power")+'</div><div><div class="rowlab"><span>Flow</span><b id="oIb"></b></div><div class="hbar"><span id="oBar"></span></div></div>';
+  bind(el,()=>{const v=val("oV"),r=val("oR"),i=v/r;set("oVv",v+" V");set("oRv",r+" Ω");set("oI",fmt(i,2)+" A");set("oP",fmt(v*i,1)+" W");set("oIb",fmt(i,2)+" A");$("#oBar").style.width=Math.min(100,i/24*100)+"%";});
+},
+energy(el){
+  el.innerHTML='<div class="ctrls">'+sl("eK","Motor load",5,500,5,75)+sl("eH","Running hours per day",1,24,1,20)+'<div class="ctrl"><label for="eT">Tariff, ₹ per kWh (use your plant\'s rate)</label><input type="number" id="eT" min="1" max="30" step="0.5" value="8"></div></div><div class="outs">'+out("eD","Energy per day")+out("eC","Cost per day")+out("eM","Cost per 30 days")+'</div>';
+  bind(el,()=>{const k=val("eK"),h=val("eH"),t=val("eT")||0,e=k*h;set("eKv",k+" kW");set("eHv",h+" h");set("eD",fmt(e)+" kWh");set("eC","₹"+fmt(e*t));set("eM","₹"+fmt(e*t*30));});
+},
+wave(el){
+  el.innerHTML='<div class="btns"><button class="btn" id="wAC" aria-pressed="true">AC, 50 Hz</button><button class="btn" id="wDC" aria-pressed="false">DC, 24 V</button></div><canvas id="wC" aria-label="Waveform"></canvas><p class="note" id="wN"></p>';
+  let mode="ac",t=0;const c=$("#wC");
+  const draw=()=>{const{x,w,h}=canvasSetup(c);x.clearRect(0,0,w,h);x.strokeStyle=css("--line");x.beginPath();x.moveTo(0,h/2);x.lineTo(w,h/2);x.stroke();
+    x.strokeStyle=css("--accent");x.lineWidth=3;x.beginPath();
+    for(let px=0;px<=w;px++){const y=mode==="ac"?h/2-Math.sin(px/w*Math.PI*6-t)*h*0.38:h*0.22;px?x.lineTo(px,y):x.moveTo(px,y);}x.stroke();
+    if(!reduce){t+=0.05;raf=requestAnimationFrame(draw);}};
+  const pick=m=>{mode=m;$("#wAC").setAttribute("aria-pressed",m==="ac");$("#wDC").setAttribute("aria-pressed",m==="dc");
+    set("wN",m==="ac"?"AC rises, falls and reverses. Above the centre line it flows one way, below it flows the other. Slowed down here: the real thing does 50 of these every second.":"DC stays at one steady level and always flows the same way.");
+    if(reduce)draw();};
+  $("#wAC").onclick=()=>pick("ac");$("#wDC").onclick=()=>pick("dc");pick("ac");if(!reduce)draw();
+},
+three(el){
+  el.innerHTML='<canvas id="tC" aria-label="Three phase waveforms"></canvas><div class="ctrls">'+sl("tV","Line voltage (phase to phase)",380,440,1,415)+'</div><div class="outs">'+out("tP","Phase voltage (phase to neutral)")+out("tS","Sum of the three waves")+'</div>';
+  const c=$("#tC");let t=0;
+  const draw=()=>{const{x,w,h}=canvasSetup(c);x.clearRect(0,0,w,h);x.strokeStyle=css("--line");x.lineWidth=1;x.beginPath();x.moveTo(0,h/2);x.lineTo(w,h/2);x.stroke();
+    ["--ph-r","--ph-y","--ph-b"].forEach((col,k)=>{x.strokeStyle=css(col);x.lineWidth=3;x.beginPath();
+      for(let px=0;px<=w;px++){const y=h/2-Math.sin(px/w*Math.PI*4-t-k*2*Math.PI/3)*h*0.38;px?x.lineTo(px,y):x.moveTo(px,y);}x.stroke();});
+    if(!reduce){t+=0.04;raf=requestAnimationFrame(draw);}};
+  draw();
+  bind(el,()=>{const v=val("tV");set("tVv",v+" V");set("tP",fmt(v/Math.sqrt(3))+" V");set("tS","0 V, always");});
+},
+pf(el){
+  el.innerHTML='<div class="ctrls">'+sl("pK","Real power the plant needs",50,1000,10,400)+sl("pF","Power factor",0.5,1,0.01,0.75)+'</div><svg id="pS" viewBox="0 0 320 240" role="img" aria-label="Power triangle" style="max-width:340px;width:100%"></svg><div class="outs">'+out("pA","Apparent power")+out("pR","Reactive power")+out("pI","Current at 415 V")+'</div><div><span class="pill" id="pP"></span></div>';
+  bind(el,()=>{const k=val("pK"),f=val("pF"),kva=k/f,kvar=Math.sqrt(kva*kva-k*k),i=k*1000/(Math.sqrt(3)*415*f);
+    set("pKv",k+" kW");set("pFv",f.toFixed(2));set("pA",fmt(kva)+" kVA");set("pR",fmt(kvar)+" kVAr");set("pI",fmt(i)+" A");
+    const b=120,hgt=b*Math.tan(Math.acos(f)),x0=30,y0=225;
+    $("#pS").innerHTML='<polygon points="'+x0+','+y0+' '+(x0+b)+','+y0+' '+(x0+b)+','+(y0-hgt)+'" fill="'+css("--accent-soft")+'" stroke="'+css("--accent")+'" stroke-width="2"/>'+
+      '<text x="'+(x0+b/2)+'" y="'+(y0+13)+'" font-size="12" text-anchor="middle" fill="'+css("--ink")+'">kW (work)</text>'+
+      '<text x="'+(x0+b+8)+'" y="'+(y0-hgt/2)+'" font-size="12" fill="'+css("--ink")+'">kVAr (foam)</text>'+
+      '<text x="'+(x0+b/2-14)+'" y="'+(y0-hgt/2-8)+'" font-size="12" text-anchor="end" fill="'+css("--ink")+'">kVA</text>';
+    const p=$("#pP");p.className="pill "+(f>=0.95?"good":f>=0.85?"warn":"bad");p.textContent=f>=0.95?"Good power factor":f>=0.85?"Poor: capacitors would help":"Bad: "+fmt((1/f-1)*100)+"% extra current for the same work";});
+},
+xfmr(el){
+  el.innerHTML='<div class="ctrls"><div class="ctrl"><label for="xP">Primary voltage</label><select id="xP"><option value="33000">33 kV</option><option value="11000" selected>11 kV</option><option value="415">415 V</option></select></div>'+sl("xN1","Primary turns",100,3000,10,1100)+sl("xN2","Secondary turns",10,3000,1,43)+'</div><div class="outs">'+out("xV","Secondary voltage")+out("xR","Turns ratio")+out("xI","Secondary current vs primary")+'</div><div><span class="pill" id="xT"></span></div>';
+  bind(el,()=>{const vp=val("xP"),a=val("xN1"),b=val("xN2"),vs=vp*b/a;set("xN1v",a);set("xN2v",b);
+    set("xV",vs>=1000?fmt(vs/1000,2)+" kV":fmt(vs)+" V");set("xR",fmt(a/b,2)+" : 1");set("xI","× "+fmt(a/b,2));
+    const p=$("#xT");p.className="pill "+(b<a?"good":b>a?"warn":"good");p.textContent=b<a?"Step-down transformer":b>a?"Step-up transformer":"Isolation transformer (1:1)";});
+},
+motor(el){
+  el.innerHTML='<div class="ctrls"><div class="ctrl"><label for="mP">Poles</label><select id="mP"><option>2</option><option selected>4</option><option>6</option><option>8</option></select></div>'+sl("mF","Supply frequency",10,60,1,50)+sl("mS","Slip (rises with load)",0,8,0.5,3)+'</div><div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap"><div class="rotor" id="mR" aria-hidden="true"></div><div class="outs" style="flex:1;min-width:220px">'+out("mN","Field speed")+out("mA","Shaft speed")+'</div></div><p class="note">The disc spins at one fiftieth of the shaft speed so you can see it.</p>';
+  bind(el,()=>{const p=val("mP"),f=val("mF"),s=val("mS"),ns=120*f/p,n=ns*(1-s/100);set("mFv",f+" Hz");set("mSv",s+" %");set("mN",fmt(ns)+" rpm");set("mA",fmt(n)+" rpm");
+    $("#mR").style.animationDuration=(60/(n/50))+"s";});
+},
+starter(el){
+  el.innerHTML='<div class="ctrls">'+sl("sF","Motor full load current",10,400,5,140)+'</div><div><div class="rowlab"><span>Running current</span><b id="sA"></b></div><div class="hbar g"><span id="sAb"></span></div></div><div><div class="rowlab"><span>DOL starting current (about 6×)</span><b id="sD"></b></div><div class="hbar r"><span id="sDb"></span></div></div><div><div class="rowlab"><span>Star-delta starting current (about 2×)</span><b id="sS"></b></div><div class="hbar"><span id="sSb"></span></div></div><p class="note">The price of the gentler start: starting torque also falls to one third, so star-delta suits machines that start lightly loaded.</p>';
+  bind(el,()=>{const f=val("sF");set("sFv",f+" A");set("sA",f+" A");set("sD",fmt(f*6)+" A");set("sS",fmt(f*2)+" A");$("#sAb").style.width=(100/6)+"%";$("#sDb").style.width="100%";$("#sSb").style.width=(200/6)+"%";});
+},
+vfd(el){
+  el.innerHTML='<div class="ctrls">'+sl("vF","Drive output frequency",5,50,1,40)+'</div><div class="outs">'+out("vN","Field speed, 4-pole motor")+out("vS","Speed vs full")+out("vP","Fan power vs full")+'</div><div><div class="rowlab"><span>Fan power</span><b id="vPb"></b></div><div class="hbar g"><span id="vBar"></span></div></div>';
+  bind(el,()=>{const f=val("vF"),r=f/50,p=r*r*r*100;set("vFv",f+" Hz");set("vN",fmt(30*f)+" rpm");set("vS",fmt(r*100)+" %");set("vP",fmt(p)+" %");set("vPb",fmt(100-p)+"% saved");$("#vBar").style.width=p+"%";});
+},
+breaker(el){
+  el.innerHTML='<div class="ctrls"><div class="ctrl"><label for="bR">Breaker rating</label><select id="bR"><option>16</option><option selected>32</option><option>63</option><option>100</option></select></div>'+sl("bI","Current flowing",0,1200,1,20)+'</div><div class="outs">'+out("bX","Multiple of rating")+'</div><div><span class="pill" id="bP"></span></div><p class="note" id="bN"></p><p class="note">Illustrative thresholds for a C-curve MCB. Real trip times come from the maker\'s curve.</p>';
+  bind(el,()=>{const r=val("bR"),i=val("bI"),m=i/r;set("bIv",i+" A");set("bX",fmt(m,1)+" ×");const p=$("#bP");let c,t,n;
+    if(m<=1){c="good";t="Holding";n="Current is within the rating. The breaker stays closed all day.";}
+    else if(m<5){c="warn";t="Overload: thermal trip";n="The bimetal strip is heating. Just above the rating it takes many minutes. At several times the rating it takes seconds.";}
+    else if(m<10){c="bad";t="Magnetic trip zone";n="Somewhere in this band the electromagnet fires and the breaker opens in a fraction of a second.";}
+    else{c="bad";t="Short circuit: instant trip";n="The electromagnet throws the contacts open in milliseconds.";}
+    p.className="pill "+c;p.textContent=t;set("bN",n);});
+},
+latch(el){
+  el.innerHTML='<div class="rung" id="lR"></div><div class="btns"><button class="btn go" id="lS">Press START</button><button class="btn stop" id="lP">Press STOP</button><button class="btn" id="lO" aria-pressed="false">Overload relay tripped</button></div><div class="outs">'+out("lC","Contactor coil")+out("lH","Holding contact")+out("lM","Motor")+'</div><p class="note">START is a momentary button. Press it once and let go: the holding contact takes over.</p>';
+  let k=false,ol=false;
+  const draw=()=>{const a=!ol,b=k;
+    $("#lR").innerHTML='L ── <span class="live">STOP (NC)</span> ── <span class="'+(a?"live":"")+'">OVERLOAD (NC)</span> ──┬── <span>START (NO)</span> ──┬── <span class="'+(b?"live":"")+'">( COIL K )</span> ── N<br>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└── <span class="'+(b?"live":"")+'">K holding</span> ──┘';
+    set("lC",b?"Energised":"Off");set("lH",b?"Closed":"Open");set("lM",b?"Running":"Stopped");$("#lO").setAttribute("aria-pressed",ol);};
+  $("#lS").onclick=()=>{if(!ol)k=true;draw();};$("#lP").onclick=()=>{k=false;draw();};$("#lO").onclick=()=>{ol=!ol;if(ol)k=false;draw();};draw();
+},
+plc(el){
+  el.innerHTML='<p class="note">A press may close only when all three conditions are true. Toggle the inputs.</p><div class="btns"><button class="btn" id="pG" aria-pressed="false">Safety gate closed</button><button class="btn" id="pE" aria-pressed="true">E-stop healthy</button><button class="btn" id="pB" aria-pressed="false">Cycle start pressed</button></div><div class="rung" id="pL"></div><div class="outs">'+out("pO","PLC output: close press")+'</div>';
+  const ids=["pG","pE","pB"],names=["GATE","E-STOP OK","START"];
+  const draw=()=>{const v=ids.map(i=>$("#"+i).getAttribute("aria-pressed")==="true"),on=v.every(Boolean);
+    $("#pL").innerHTML="|── "+v.map((x,i)=>'<span class="'+(x?"live":"")+'">[ '+names[i]+" ]</span>").join(" ── ")+' ── <span class="'+(on?"live":"")+'">( CLOSE PRESS )</span> ──|';
+    set("pO",on?"ON":"OFF");};
+  ids.forEach(i=>{$("#"+i).onclick=e=>{const b=e.currentTarget;b.setAttribute("aria-pressed",b.getAttribute("aria-pressed")!=="true");draw();};});draw();
+},
+loto(el){
+  const steps=["Tell the operators and stop the machine normally","Switch off the isolator for every energy source","Fit your own padlock and name tag","Release stored energy: air, steam, hydraulics, spinning parts","Test for dead with a proven meter and try the start button","Start work"];
+  const order=[3,0,5,2,4,1];let next=0;
+  el.innerHTML='<p class="note">Click the six steps in the correct order.</p><div class="steps">'+order.map(i=>'<button class="btn" data-i="'+i+'">'+steps[i]+"</button>").join("")+'</div><div><span class="pill warn" id="loP">Step 1 of 6</span></div>';
+  el.querySelectorAll(".steps button").forEach(b=>b.onclick=()=>{const i=+b.dataset.i;if(b.classList.contains("ok"))return;
+    if(i===next){b.classList.remove("no");b.classList.add("ok");b.textContent=(next+1)+". "+steps[i];next++;const p=$("#loP");
+      if(next===6){p.className="pill good";p.textContent="Correct. That order keeps you alive.";}else p.textContent="Step "+(next+1)+" of 6";}
+    else{b.classList.add("no");setTimeout(()=>b.classList.remove("no"),600);}});
+}
+};
+
+/* ---------- views ---------- */
+function start(){
+  main.innerHTML='<section class="card"><span class="eyebrow">Day 0 briefing</span><h2 class="lesson-title">Welcome to the shop floor</h2>'+
+  '<p class="oneline">'+L.length+' lessons that start from zero and cover the electrical basics a plant engineer is expected to know, each tied to what you will see in a tyre plant.</p>'+
+  '<div class="prose"><p>You need no background. The lessons are in a fixed order and each one only uses ideas from the ones before it. Do one a day: read the explanation, study the circuit diagram and worked example, play, watch, quiz, then find the real thing on the shop floor. Come back each day for a five-question review so it sticks.</p></div>'+
+  '<div class="btns"><a class="btn primary" href="#'+((L.find(l=>!S.done[l.id])||L[0]).id)+'" style="text-decoration:none">'+(xp()?"Continue learning":"Start lesson 1")+'</a><a class="btn" href="#plan" style="text-decoration:none">See my plan</a><a class="btn" href="#review" style="text-decoration:none">Daily review</a><a class="btn" href="#formulas" style="text-decoration:none">Formula sheet</a><a class="btn" href="#glossary" style="text-decoration:none">Glossary</a></div></section>'+
+  '<section class="card"><h2>The course</h2><div class="mods">'+MODS.map((m,i)=>'<div class="mod"><h3>'+m+"</h3>"+L.filter(l=>l.m===i).map(l=>'<a href="#'+l.id+'">'+(S.done[l.id]?"✓ ":"")+l.t+"</a>").join("")+"</div>").join("")+"</div></section>"+
+  '<section class="card"><h2>Five habits for your first week</h2><ol class="tips">'+
+  "<li><b>Treat everything as live</b> until you have isolated, locked and tested it yourself.</li>"+
+  "<li><b>Ask before you open or touch any panel.</b> Shadow a technician and watch how they work.</li>"+
+  "<li><b>Find the single line diagram</b> of the plant and trace the path from the incoming supply to one machine.</li>"+
+  "<li><b>Read nameplates.</b> Note the kW, amps and rpm of every motor you pass. Patterns appear quickly.</li>"+
+  "<li><b>Carry a notebook.</b> Write down each breakdown: what stopped, what the cause was, how it was fixed.</li></ol>"+
+  '<p class="note">This site teaches concepts. Your plant\'s own safety rules and procedures always come first.</p></section>';
+}
+
+function lesson(l){
+  const i=L.indexOf(l),prev=L[i-1],next=L[i+1];
+  let h='<section class="card"><span class="stamp" id="stamp" hidden>Done</span><span class="eyebrow">Lesson '+(i+1)+" of "+L.length+" · "+MODS[l.m]+'</span><h2 class="lesson-title">'+l.t+'</h2><p class="oneline">'+l.one+'</p>'+
+    '<div class="prose">'+l.body.map(p=>"<p>"+p+"</p>").join("")+'</div><div class="formula">'+l.formula+'</div>'+
+    '<div class="plant"><b>On the shop floor</b>'+l.plant+"</div>"+
+    '<label class="check"><input type="checkbox" id="mis-'+l.id+'" data-k="mis:'+l.id+'"'+(S.mis[l.id]?" checked":"")+'><span><b>Floor mission, +10 XP.</b> '+F[l.id]+"</span></label>"+
+    '<p class="note"><b>Explain it back.</b> Without looking, explain this lesson out loud in two sentences, as if to a new operator. If you get stuck, reread the first paragraph.</p></section>';
+  const dg=D[l.id],xx=X[l.id];
+  if(dg)h+='<section class="card"><h2>Circuit diagram</h2><figure>'+dg.svg+"<figcaption>"+dg.cap+'</figcaption></figure><p><b>How to read it</b></p><ol class="tips">'+dg.steps.map(t=>"<li>"+t+"</li>").join("")+"</ol></section>";
+  if(xx)h+='<section class="card"><h2>Understand it properly</h2><div class="prose"><p>'+xx[0]+'</p></div><div class="ex"><b>Worked example</b>'+xx[1]+'</div><div class="miss"><b>Common mistake</b>'+xx[2]+"</div></section>";
+  if(l.w)h+='<section class="card"><h2>Try it</h2><div class="lab" id="lab"></div></section>';
+  h+='<section class="card"><h2>Watch</h2><div class="videos">'+l.v.map(v=>'<a class="video" href="'+v.u+'"'+TGT+' rel="noopener"><span class="play" aria-hidden="true"></span><span><b>'+v.t+"</b><small>"+v.c+" · "+(v.s?"opens a YouTube search for this video":"opens on YouTube")+"</small></span></a>").join("")+"</div></section>";
+  h+='<section class="card"><h2>My notes</h2><label class="note" for="notes">What you saw on the floor, questions for your senior, anything to remember. Saved in this browser.</label><textarea id="notes" rows="4" placeholder="Write here"></textarea></section>';
+  h+='<section class="card"><h2>Check yourself</h2><div id="quiz"></div><div class="foot"><span id="qmsg" class="note"></span><div class="btns">'+
+    (prev?'<a class="btn" style="text-decoration:none" href="#'+prev.id+'">← Previous</a>':"")+
+    '<button class="btn" id="doneBtn"></button>'+
+    (next?'<a class="btn primary" style="text-decoration:none" href="#'+next.id+'">Next lesson →</a>':'<a class="btn primary" style="text-decoration:none" href="#start">Back to start</a>')+"</div></div></section>";
+  main.innerHTML=h;
+  if(l.w)W[l.w]($("#lab"));
+  quiz(l);
+  const nt=$("#notes");nt.value=S.notes[l.id]||"";nt.oninput=()=>{S.notes[l.id]=nt.value;save();};
+  const db=$("#doneBtn");
+  const paint=()=>{$("#stamp").hidden=!S.done[l.id];db.textContent=S.done[l.id]?"✓ Lesson done":"Mark lesson done";db.setAttribute("aria-pressed",!!S.done[l.id]);};
+  db.onclick=()=>{S.done[l.id]=!S.done[l.id];save();paint();meter();nav(l.id);};paint();
+}
+
+function quiz(l){
+  const box=$("#quiz"),ans=S.quiz[l.id]||(S.quiz[l.id]=[]);
+  box.innerHTML=l.quiz.map((q,qi)=>'<div class="q"><p>'+(qi+1)+". "+q.q+'</p><div class="opts">'+q.o.map((o,oi)=>'<button class="opt" data-q="'+qi+'" data-o="'+oi+'">'+o+"</button>").join("")+'</div><div class="why" id="why'+qi+'"></div></div>').join("");
+  const reveal=(qi,chosen)=>{const q=l.quiz[qi];box.querySelectorAll('[data-q="'+qi+'"]').forEach(b=>{b.disabled=true;const oi=+b.dataset.o;if(oi===q.a)b.classList.add("right");else if(oi===chosen)b.classList.add("wrong");});
+    $("#why"+qi).textContent=(chosen===q.a?"Correct. ":"Not quite. ")+q.y;};
+  box.querySelectorAll(".opt").forEach(b=>b.onclick=()=>{const qi=+b.dataset.q,oi=+b.dataset.o;if(ans[qi]!=null)return;
+    ans[qi]=oi===l.quiz[qi].a;reveal(qi,oi);
+    if(l.quiz.every((_,k)=>ans[k]!=null)){S.done[l.id]=true;$("#qmsg").textContent="Lesson complete. "+ans.filter(Boolean).length+" of "+l.quiz.length+" correct.";const db=$("#doneBtn");db.textContent="✓ Lesson done";db.setAttribute("aria-pressed","true");$("#stamp").hidden=false;nav(l.id);}
+    save();meter();});
+  if(l.quiz.every((_,k)=>ans[k]!=null))$("#qmsg").innerHTML='You scored '+ans.filter(Boolean).length+" of "+l.quiz.length+' last time. <button class="btn" id="retry">Try again</button>';
+  const r=$("#retry");if(r)r.onclick=()=>{S.quiz[l.id]=[];save();meter();$("#qmsg").textContent="";quiz(l);};
+}
+
+
+/* extra widgets */
+W.sorter=function(el){
+  const items=[["Copper",1],["PVC",0],["Aluminium",1],["Dry wood",0],["Steel",1],["Glass",0],["Salty water",1],["Tyre rubber with carbon black",2]];
+  el.innerHTML='<p class="note">Tap the materials you think will let current flow.</p><div class="btns">'+items.map((x,i)=>'<button class="btn" data-i="'+i+'">'+x[0]+"</button>").join("")+'</div><p class="note" id="soN">Conductors found: 0 of 4</p>';
+  let n=0;el.querySelectorAll("button").forEach(b=>b.onclick=()=>{if(b.disabled)return;const k=items[+b.dataset.i][1];b.disabled=true;
+    b.style.borderColor=css(k===1?"--good":k===0?"--bad":"--warn");b.style.background=css(k===1?"--good-soft":k===0?"--bad-soft":"--warn-soft");
+    b.textContent+=k===1?": conductor":k===0?": insulator":": in between. It leaks static away but will not carry real current";if(k===1)n++;set("soN","Conductors found: "+n+" of 4");});
+};
+W.sp=function(el){
+  el.innerHTML='<div class="btns"><button class="btn" id="spS" aria-pressed="true">Series</button><button class="btn" id="spP" aria-pressed="false">Parallel</button></div><div class="ctrls">'+sl("spA","Resistor 1",1,100,1,20)+sl("spB","Resistor 2",1,100,1,30)+'</div><div class="outs">'+out("spR","Total resistance")+out("spI","Current from a 24 V supply")+'</div><p class="note" id="spN"></p>';
+  let par=false;
+  const draw=()=>{const a=val("spA"),b=val("spB"),r=par?a*b/(a+b):a+b;set("spAv",a+" Ω");set("spBv",b+" Ω");set("spR",fmt(r,1)+" Ω");set("spI",fmt(24/r,2)+" A");
+    $("#spS").setAttribute("aria-pressed",!par);$("#spP").setAttribute("aria-pressed",par);
+    set("spN",par?"Parallel: each resistor sees the full 24 V. Currents are "+fmt(24/a,2)+" A and "+fmt(24/b,2)+" A, and they add. Total resistance is lower than either resistor.":"Series: the same current flows through both. The 24 V is shared: "+fmt(24*a/r,1)+" V and "+fmt(24*b/r,1)+" V.");};
+  $("#spS").onclick=()=>{par=false;draw();};$("#spP").onclick=()=>{par=true;draw();};el.addEventListener("input",draw);draw();
+};
+W.induce=function(el){
+  el.innerHTML='<div class="ctrls">'+sl("inS","How fast the magnet moves",0,10,1,4)+sl("inT","Turns on the coil",10,500,10,200)+'</div><div><div class="rowlab"><span>Induced voltage (relative)</span><b id="inV"></b></div><div class="hbar"><span id="inB"></span></div></div><p class="note" id="inN"></p>';
+  bind(el,()=>{const s=val("inS"),t=val("inT"),v=s*t/5000*100;set("inSv",s===0?"still":s);set("inTv",t);set("inV",fmt(v)+" %");$("#inB").style.width=v+"%";
+    set("inN",s===0?"The magnet is still. However strong it is, a steady field induces nothing.":"Faster movement or more turns both give more voltage.");});
+};
+W.sld=function(el){
+  const n=[["33 kV or 11 kV incomer","Power arrives from the grid at high voltage."],["HT breaker","Switches and protects the whole incoming supply."],["Transformer","Steps the voltage down to 433 V for the plant."],["Main LT panel, ACB","The main low-voltage switchboard. An air circuit breaker protects it."],["MCC, MCCB","Motor control centre. One feeder with its own breaker for each machine or motor."],["Starter or drive","Contactor and overload, or a VFD, that starts and controls the motor."],["Motor","Turns electrical energy into movement."]];
+  el.innerHTML='<p class="note">A typical power path, top to bottom. Tap each block.</p><div class="steps">'+n.map((x,i)=>'<button class="btn" data-i="'+i+'">'+(i?"↓ ":"")+x[0]+"</button>").join("")+'</div><p id="slN"><b>'+n[0][0]+".</b> "+n[0][1]+"</p>";
+  el.querySelectorAll("button").forEach(b=>b.onclick=()=>{const x=n[+b.dataset.i];el.querySelectorAll("button").forEach(o=>o.classList.remove("ok"));b.classList.add("ok");$("#slN").innerHTML="<b>"+x[0]+".</b> "+x[1];});
+};
+W.fault=function(el){
+  const st=[
+   {s:"A conveyor motor will not start. The operator has pressed START several times.",o:["Open the panel and start probing live terminals","Ask the operator what happened and look at the panel lamps and alarms","Order a new motor"],a:1},
+   {s:"The operator says it stopped suddenly. The lamp marked OVERLOAD TRIPPED is on.",o:["Reset the overload and walk away","Find out why: is the belt jammed, is the motor hot?","Turn the overload setting up"],a:1},
+   {s:"You find rubber scrap jammed in a roller.",o:["Pull it out quickly while the machine is live","Bypass the overload so it keeps running","Isolate and lock out, clear the jam, then reset and test-run while checking the current"],a:2}];
+  let i=0;
+  const draw=()=>{if(i>=st.length){el.innerHTML='<span class="pill good">Fixed, safely, and the cause is known</span><p>You asked, looked, found the cause and made it safe before touching it. Now write it in your log.</p>';return;}
+    const x=st[i];el.innerHTML='<p><b>Step '+(i+1)+" of "+st.length+".</b> "+x.s+'</p><div class="steps">'+x.o.map((o,k)=>'<button class="btn" data-k="'+k+'">'+o+"</button>").join("")+'</div><p class="note" id="faN">What do you do?</p>';
+    el.querySelectorAll("button").forEach(b=>b.onclick=()=>{if(+b.dataset.k===x.a){i++;draw();}else{b.classList.add("no");set("faN","That is risky or skips the cause. Try another option.");}});};
+  draw();
+};
+
+/* hands-on animations */
+function circuit(el){
+  el.innerHTML='<canvas id="ciC" class="tall" aria-label="A simple circuit with a battery, a switch and a lamp"></canvas><div class="btns"><button class="btn primary" id="ciB"></button></div><p class="note" id="ciN"></p>';
+  const c=$("#ciC");let on=false,off=0;
+  const draw=()=>{const{x,w,h}=canvasSetup(c);x.clearRect(0,0,w,h);
+    const x0=40,y0=34,rw=w-80,rh=h-64,P=2*(rw+rh),sx=x0+rw/2-22,ex=x0+rw/2+22,by=y0+rh/2,lx=x0+rw;
+    const pt=d=>{d=((d%P)+P)%P;if(d<rw)return[x0+d,y0];d-=rw;if(d<rh)return[x0+rw,y0+d];d-=rh;if(d<rw)return[x0+rw-d,y0+rh];d-=rw;return[x0,y0+rh-d];};
+    x.lineWidth=4;x.lineJoin="round";x.lineCap="round";x.strokeStyle=css("--ink");
+    x.beginPath();x.moveTo(sx,y0);x.lineTo(x0,y0);x.lineTo(x0,y0+rh);x.lineTo(x0+rw,y0+rh);x.lineTo(x0+rw,y0);x.lineTo(ex,y0);x.stroke();
+    x.beginPath();x.moveTo(sx,y0);if(on)x.lineTo(ex,y0);else x.lineTo(ex-8,y0-22);x.stroke();
+    x.fillStyle=css("--accent");
+    for(let k=0;k<26;k++){const q=pt(off+k*P/26);if(!on&&q[1]===y0&&q[0]>sx-4&&q[0]<ex+4)continue;x.beginPath();x.arc(q[0],q[1],4,0,7);x.fill();}
+    x.fillStyle=css("--ink");[sx,ex].forEach(a=>{x.beginPath();x.arc(a,y0,5,0,7);x.fill();});
+    x.fillStyle=css("--surface");x.fillRect(x0-16,by-11,32,22);
+    x.beginPath();x.moveTo(x0-16,by-8);x.lineTo(x0+16,by-8);x.stroke();x.lineWidth=7;x.beginPath();x.moveTo(x0-9,by+8);x.lineTo(x0+9,by+8);x.stroke();x.lineWidth=4;
+    x.beginPath();x.arc(lx,by,18,0,7);x.fillStyle=on?css("--hl"):css("--surface");x.fill();x.stroke();
+    if(on){x.strokeStyle=css("--warn");x.lineWidth=2;for(let k=0;k<8;k++){const a=k*Math.PI/4;x.beginPath();x.moveTo(lx+Math.cos(a)*24,by+Math.sin(a)*24);x.lineTo(lx+Math.cos(a)*32,by+Math.sin(a)*32);x.stroke();}}
+    x.fillStyle=css("--muted");x.font="13px sans-serif";x.textAlign="left";x.fillText("battery",x0+24,by+4);x.textAlign="right";x.fillText("lamp",lx-40,by+4);x.textAlign="center";x.fillText("switch",x0+rw/2,y0+24);
+    if(on)off+=1.6;
+    if(!reduce)raf=requestAnimationFrame(draw);};
+  const upd=()=>{$("#ciB").textContent=on?"Open the switch":"Close the switch";set("ciN",on?"The loop is complete. Electrons drift round it and the lamp lights.":"The loop is broken. Nothing flows anywhere, not even next to the battery.");if(reduce)draw();};
+  $("#ciB").onclick=()=>{on=!on;upd();};upd();if(!reduce)draw();
+}
+W.elec=function(el){el.innerHTML='<div id="elA" style="display:flex;flex-direction:column;gap:12px"></div><div id="elB" style="display:flex;flex-direction:column;gap:12px"></div>';circuit($("#elA"));W.sorter($("#elB"));};
+W.ohm2=function(el){
+  el.innerHTML='<canvas id="ofC" aria-label="Dots flowing through a pipe that narrows as resistance rises"></canvas><div id="ofI" style="display:flex;flex-direction:column;gap:14px"></div><p class="note">The dots are the current. Raise the voltage and they speed up. Raise the resistance and the pipe narrows and they slow down.</p>';
+  W.ohm($("#ofI"));
+  const c=$("#ofC"),ps=Array.from({length:46},()=>({u:Math.random(),l:Math.random()*2-1}));
+  const draw=()=>{const{x,w,h}=canvasSetup(c);x.clearRect(0,0,w,h);const v=val("oV"),r=val("oR"),i=v/r,full=h*0.36,nar=full-(r/100)*(full-9);
+    const hh=px=>{let t=Math.min(1,Math.abs(px-w/2)/(w*0.22));t=t*t*(3-2*t);return nar+(full-nar)*t;};
+    x.strokeStyle=css("--ink");x.lineWidth=3;[1,-1].forEach(sg=>{x.beginPath();for(let px=0;px<=w;px+=4){const y=h/2+sg*hh(px);if(px)x.lineTo(px,y);else x.moveTo(px,y);}x.stroke();});
+    x.fillStyle=css("--accent");const sp=Math.min(9,0.3+i*1.1)/w;
+    ps.forEach(p=>{if(!reduce){p.u+=sp;if(p.u>1)p.u-=1;}const px=p.u*w;x.beginPath();x.arc(px,h/2+p.l*(hh(px)-6),3.5,0,7);x.fill();});
+    if(!reduce)raf=requestAnimationFrame(draw);};
+  draw();if(reduce)el.addEventListener("input",draw);
+};
+W.induce=function(el){
+  el.innerHTML='<canvas id="inC" class="tall drag" tabindex="0" aria-label="Drag the magnet through the coil"></canvas><div class="ctrls">'+sl("inT","Turns on the coil",10,500,10,200)+'</div><div class="outs">'+out("inV","Voltage right now (relative)")+out("inP","Highest so far")+'</div><p class="note">Drag the magnet through the coil, fast and then slowly. Then hold it still inside the coil and watch the needle. The left and right arrow keys also move it.</p>';
+  const c=$("#inC");let mx=60,prev=60,sig=0,peak=0,drag=false;
+  const lim=v=>Math.max(40,Math.min(c.clientWidth-40,v));
+  const pos=e=>{mx=lim(e.clientX-c.getBoundingClientRect().left);};
+  c.onpointerdown=e=>{drag=true;try{c.setPointerCapture(e.pointerId);}catch(_){}pos(e);};
+  c.onpointermove=e=>{if(drag)pos(e);};c.onpointerup=c.onpointercancel=()=>{drag=false;};
+  c.onkeydown=e=>{if(e.key==="ArrowRight"||e.key==="ArrowLeft"){e.preventDefault();mx=lim(mx+(e.key==="ArrowRight"?24:-24));}};
+  const tv=()=>set("inTv",val("inT"));$("#inT").oninput=tv;tv();
+  const draw=()=>{const{x,w,h}=canvasSetup(c),cx=w/2,cy=h*0.66,t=val("inT");
+    const vel=mx-prev;prev=mx;const near=Math.exp(-Math.pow((mx-cx)/(w*0.2),2));sig+=(vel*near*t/200-sig)*0.25;if(Math.abs(sig)<0.01)sig=0;peak=Math.max(peak,Math.abs(sig));
+    x.clearRect(0,0,w,h);
+    const gx=cx,gy=h*0.3,R=h*0.22;x.lineWidth=3;x.strokeStyle=css("--line");x.beginPath();x.arc(gx,gy,R,Math.PI,2*Math.PI);x.stroke();
+    const a=-Math.PI/2+Math.max(-1.3,Math.min(1.3,sig/6));x.strokeStyle=css("--bad");x.beginPath();x.moveTo(gx,gy);x.lineTo(gx+Math.cos(a)*R*0.9,gy+Math.sin(a)*R*0.9);x.stroke();
+    x.fillStyle=css("--muted");x.font="13px sans-serif";x.textAlign="center";x.fillText("0",gx,gy-R-5);x.fillText("−",gx-R-10,gy+4);x.fillText("+",gx+R+10,gy+4);
+    x.strokeStyle=css("--warn");const n=Math.round(4+t/50);for(let k=0;k<n;k++){x.beginPath();x.ellipse(cx-50+k*100/(n-1),cy,9,32,0,0,7);x.stroke();}
+    x.fillStyle=css("--ph-r");x.fillRect(mx-36,cy-14,36,28);x.fillStyle=css("--ph-b");x.fillRect(mx,cy-14,36,28);x.fillStyle="#fff";x.font="bold 14px sans-serif";x.fillText("N",mx-18,cy+5);x.fillText("S",mx+18,cy+5);
+    set("inV",fmt(Math.abs(sig)*10));set("inP",fmt(peak*10));
+    raf=requestAnimationFrame(draw);};
+  draw();
+};
+
+/* widgets for the industry-level lessons */
+W.react=function(el){
+  el.innerHTML='<div class="ctrls">'+sl("rxF","Frequency",10,400,10,50)+sl("rxL","Inductor",1,500,1,100)+sl("rxC","Capacitor",1,500,1,100)+'</div><div class="outs">'+out("rxXL","Inductive reactance XL")+out("rxXC","Capacitive reactance XC")+'</div><p class="note" id="rxN"></p>';
+  bind(el,()=>{const f=val("rxF"),l=val("rxL")/1000,c=val("rxC")/1e6,xl=2*Math.PI*f*l,xc=1/(2*Math.PI*f*c);set("rxFv",f+" Hz");set("rxLv",val("rxL")+" mH");set("rxCv",val("rxC")+" µF");set("rxXL",fmt(xl,1)+" Ω");set("rxXC",fmt(xc,1)+" Ω");
+    set("rxN",Math.abs(xl-xc)<0.08*xl?"XL and XC are almost equal. This is resonance.":"Slide the frequency up: the inductor opposes more, the capacitor less.");});
+};
+W.rect=function(el){
+  el.innerHTML='<div class="btns"><button class="btn" id="rcA" aria-pressed="true">Half-wave (1 diode)</button><button class="btn" id="rcB" aria-pressed="false">Full-wave (4 diodes)</button><button class="btn" id="rcC" aria-pressed="false">Full-wave with capacitor</button></div><canvas id="rcV" aria-label="Rectifier output waveform"></canvas><p class="note" id="rcN"></p>';
+  let m=0;const c=$("#rcV"),txt=["One diode passes only the positive half of each cycle. Half the wave is thrown away.","Four diodes in a bridge flip the negative halves upward. The output never reverses but it still pulses.","A capacitor fills the gaps between peaks. The result is nearly steady DC: this is what a power supply and a drive's DC bus do."];
+  const draw=()=>{const{x,w,h}=canvasSetup(c);x.clearRect(0,0,w,h);const mid=h/2,A=h*0.36,ph=px=>px/w*Math.PI*6;
+    x.strokeStyle=css("--line");x.lineWidth=1;x.beginPath();x.moveTo(0,mid);x.lineTo(w,mid);x.stroke();
+    x.lineWidth=1.5;x.beginPath();for(let px=0;px<=w;px++){const y=mid-Math.sin(ph(px))*A;if(px)x.lineTo(px,y);else x.moveTo(px,y);}x.stroke();
+    x.strokeStyle=css("--accent");x.lineWidth=3;x.beginPath();let cap=0;
+    for(let px=0;px<=w;px++){const sn=Math.sin(ph(px));let v=m===0?Math.max(0,sn):Math.abs(sn);if(m===2){cap=Math.max(v,cap-0.0035);v=cap;}const y=mid-v*A;if(px)x.lineTo(px,y);else x.moveTo(px,y);}x.stroke();};
+  const pick=k=>{m=k;["rcA","rcB","rcC"].forEach((id,i)=>$("#"+id).setAttribute("aria-pressed",i===k));set("rcN",txt[k]);draw();};
+  $("#rcA").onclick=()=>pick(0);$("#rcB").onclick=()=>pick(1);$("#rcC").onclick=()=>pick(2);pick(0);
+};
+W.outage=function(el){
+  const st=[["Normal running","The grid feeds everything through the transformer.",[1,1,1]],["The grid fails","Lights and motors stop. The UPS carries the controls on its batteries with no break.",[1,0,0]],["The DG starts","The engine cranks and runs up to speed. This takes some seconds. The UPS is still holding the controls.",[1,0,0]],["The DG breaker closes","Essential loads come back on generator power. Non-essential loads stay off to keep within the DG's capacity.",[1,1,0]],["The grid returns","After it is stable, the load is changed back to the grid and the DG cools down and stops.",[1,1,1]]];
+  let i=0;el.innerHTML='<p id="ouT"></p><div class="outs">'+out("ou0","PLCs and controls (on UPS)")+out("ou1","Essential loads (on DG)")+out("ou2","Other loads")+'</div><div class="btns"><button class="btn primary" id="ouN">Next step</button></div>';
+  const draw=()=>{const s=st[i];$("#ouT").innerHTML="<b>"+(i+1)+". "+s[0]+".</b> "+s[1];s[2].forEach((v,k)=>{const o=$("#ou"+k);o.textContent=v?"ON":"OFF";o.style.color=css(v?"--good":"--bad");});$("#ouN").textContent=i===st.length-1?"Start again":"Next step";};
+  $("#ouN").onclick=()=>{i=(i+1)%st.length;draw();};draw();
+};
+W.vdrop=function(el){
+  const R={"2.5":7.41,"4":4.61,"6":3.08,"10":1.83,"16":1.15,"25":0.727,"35":0.524,"50":0.387,"70":0.268,"95":0.193,"120":0.153};
+  el.innerHTML='<div class="ctrls">'+sl("vdI","Load current",5,300,5,100)+sl("vdL","Cable length",5,500,5,150)+'<div class="ctrl"><label for="vdS">Copper conductor size</label><select id="vdS">'+Object.keys(R).map(k=>'<option value="'+k+'"'+(k==="35"?" selected":"")+">"+k+" sq mm</option>").join("")+'</select></div></div><div class="outs">'+out("vdV","Voltage drop")+out("vdP","Share of 415 V")+out("vdM","Voltage at the motor")+'</div><div><span class="pill" id="vdQ"></span></div><p class="note">Resistance only, at 20 °C. Real designs also allow for temperature, reactance and the current rating of the cable. Many designs aim to keep the drop under about 3 to 5%.</p>';
+  bind(el,()=>{const i=val("vdI"),l=val("vdL"),r=R[$("#vdS").value],d=Math.sqrt(3)*i*r*l/1000,p=d/415*100;set("vdIv",i+" A");set("vdLv",l+" m");set("vdV",fmt(d,1)+" V");set("vdP",fmt(p,1)+" %");set("vdM",fmt(415-d)+" V");
+    const q=$("#vdQ");q.className="pill "+(p<=3?"good":p<=5?"warn":"bad");q.textContent=p<=3?"Comfortable":p<=5?"Borderline: consider the next size up":"Too much drop: use a thicker cable";});
+};
+W.ct=function(el){
+  el.innerHTML='<div class="ctrls">'+sl("ctI","Current in the busbar",0,2000,10,480)+'<div class="ctrl"><label for="ctR">CT ratio</label><select id="ctR"><option value="200">200/5</option><option value="400">400/5</option><option value="800" selected>800/5</option><option value="1600">1600/5</option></select></div></div><div class="outs">'+out("ctS","Current to the relay")+out("ctP","Share of CT rating")+'</div><div><span class="pill" id="ctQ"></span></div>';
+  bind(el,()=>{const i=val("ctI"),r=val("ctR"),sec=i*5/r;set("ctIv",i+" A");set("ctS",fmt(sec,2)+" A");set("ctP",fmt(i/r*100)+" %");const q=$("#ctQ");q.className="pill "+(sec<=5?"good":"bad");q.textContent=sec<=5?"Within the CT rating":"Above the rating: a relay set at 5 A is now timing towards a trip";});
+};
+W.harm=function(el){
+  el.innerHTML='<canvas id="hmC" aria-label="Sine wave distorted by harmonics"></canvas><div class="ctrls">'+sl("hm5","5th harmonic (250 Hz)",0,40,1,20)+sl("hm7","7th harmonic (350 Hz)",0,30,1,10)+'</div><div class="outs">'+out("hmT","Total harmonic distortion")+'</div><p class="note">The thin line is a clean 50 Hz wave. The bold line is what you get when the harmonics are added.</p>';
+  const c=$("#hmC");
+  bind(el,()=>{const a5=val("hm5")/100,a7=val("hm7")/100;set("hm5v",val("hm5")+" %");set("hm7v",val("hm7")+" %");set("hmT",fmt(Math.sqrt(a5*a5+a7*a7)*100,1)+" %");
+    const{x,w,h}=canvasSetup(c);x.clearRect(0,0,w,h);const mid=h/2,A=h*0.3;
+    [[1.5,"--line",0],[3,"--accent",1]].forEach(s=>{x.lineWidth=s[0];x.strokeStyle=css(s[1]);x.beginPath();for(let px=0;px<=w;px++){const t=px/w*Math.PI*4,y=mid-(Math.sin(t)+s[2]*(a5*Math.sin(5*t)+a7*Math.sin(7*t)))*A;if(px)x.lineTo(px,y);else x.moveTo(px,y);}x.stroke();});});
+};
+W.ma=function(el){
+  el.innerHTML='<div class="ctrls"><div class="ctrl"><label for="maL">Range low (at 4 mA)</label><input type="number" id="maL" value="0"></div><div class="ctrl"><label for="maH">Range high (at 20 mA)</label><input type="number" id="maH" value="200"></div>'+sl("maI","Signal",0,20,0.1,13.6)+'</div><div class="outs">'+out("maV","Measured value")+out("maP","Share of range")+'</div><div><span class="pill" id="maQ"></span></div>';
+  bind(el,()=>{const lo=val("maL")||0,hi=val("maH")||0,i=val("maI"),p=(i-4)/16,q=$("#maQ");set("maIv",i.toFixed(1)+" mA");
+    if(i<3.8){set("maV","-");set("maP","-");q.className="pill bad";q.textContent="Below 4 mA: broken wire or failed transmitter";}
+    else{set("maV",fmt(lo+p*(hi-lo),1));set("maP",fmt(p*100)+" %");q.className="pill good";q.textContent="Valid signal";}});
+};
+W.pi=function(el){
+  el.innerHTML='<div class="ctrls">'+sl("piA","Reading after 1 minute",1,1000,1,200)+sl("piB","Reading after 10 minutes",1,3000,1,500)+'</div><div class="outs">'+out("piV","Polarisation index")+'</div><div><span class="pill" id="piQ"></span></div><p class="note">Typical guidance: below 1 is poor, 1 to 2 is questionable, 2 or more is good. Follow the limits in your plant\'s test procedure.</p>';
+  bind(el,()=>{const a=val("piA"),b=val("piB"),v=b/a,q=$("#piQ");set("piAv",a+" MΩ");set("piBv",b+" MΩ");set("piV",fmt(v,2));q.className="pill "+(v>=2?"good":v>=1?"warn":"bad");q.textContent=v>=2?"Good: insulation is dry and clean":v>=1?"Questionable: possible moisture or dirt":"Poor: investigate before energising";});
+};
+W.eff=function(el){
+  el.innerHTML='<div class="ctrls">'+sl("efK","Motor output",5,300,5,75)+sl("efH","Running hours a year",500,8500,100,6000)+sl("efA","Old motor efficiency",80,95,0.5,91)+sl("efB","New motor efficiency",88,97,0.5,95)+'<div class="ctrl"><label for="efT">Tariff, ₹ per kWh</label><input type="number" id="efT" min="1" max="30" step="0.5" value="8"></div></div><div class="outs">'+out("efS","Power saved")+out("efE","Energy saved a year")+out("efR","Money saved a year")+'</div>';
+  bind(el,()=>{const k=val("efK"),h=val("efH"),a=val("efA")/100,b=val("efB")/100,t=val("efT")||0,s=Math.max(0,k*(1/a-1/b));set("efKv",k+" kW");set("efHv",h+" h");set("efAv",val("efA")+" %");set("efBv",val("efB")+" %");set("efS",fmt(s,1)+" kW");set("efE",fmt(s*h)+" kWh");set("efR","₹"+fmt(s*h*t));});
+};
+
+function formulas(){
+  main.innerHTML='<section class="card"><span class="eyebrow">Quick reference</span><h2 class="lesson-title">Formula sheet</h2><p class="oneline">Every key formula and rule from the course, in lesson order.</p></section>'+
+   ORDER.map((ids,m)=>'<section class="card"><h2>'+MODS[m]+"</h2>"+ids.map(id=>{const l=L.find(x=>x.id===id);return '<div><p><a href="#'+id+'"><b>'+l.t+'</b></a></p><div class="formula">'+l.formula+"</div></div>";}).join("")+"</section>").join("");
+}
+
+function plan(){
+  let day=0;
+  const stage=(ids,m)=>'<div class="mod"><h3>'+MODS[m]+"</h3>"+ids.map(id=>{const l=L.find(x=>x.id===id);day++;return '<a href="#'+id+'">'+(S.done[id]?"✓ ":"")+"Day "+day+": "+l.t+"</a>";}).join("")+"</div>";
+  const road=[
+   ["First 30 days: learn the language",["Finish all "+L.length+" lessons and floor missions","Know the plant LOTO procedure by heart","Trace the single line diagram from the incomer to one machine","Shadow at least five breakdowns and log each one"]],
+   ["Days 31 to 90: understand one machine fully",["Read one machine's control drawings end to end","Learn the fault codes of the drive type used most in your area","Go online on a PLC with a senior engineer and watch the logic run","Log ten breakdowns with symptom, cause and fix"]],
+   ["Months 3 to 12: start owning things",["Take over the preventive maintenance checks for one area","Learn insulation resistance testing and thermal imaging of panels","Write or modify a small PLC routine under supervision","Lead one small improvement: a repeat fault removed or energy saved"]],
+   ["Years 1 to 3: choose a direction",["Automation: PLC, HMI, drives and networks","Power systems: HT switchgear, protection relays, substations","Energy management: audits and savings projects. In India, look at the BEE energy manager certification","Reliability: root cause analysis and condition monitoring","Ask about the electrical supervisor competency certificate in your state"]]];
+  main.innerHTML='<section class="card"><span class="eyebrow">How to learn this from zero</span><h2 class="lesson-title">My plan</h2>'+
+   '<p class="oneline">One lesson each working day, about 20 to 30 minutes, in this order. '+L.length+' working days to a complete industry-level base.</p>'+
+   '<ol class="tips"><li><b>Safety before theory.</b> Day 1 is lockout-tagout.</li><li><b>Picture first, formula second.</b> Get the water-pipe idea, then the numbers.</li><li><b>Read, play, watch, quiz.</b> Four short steps in every lesson.</li><li><b>See the real thing the same day.</b> Each lesson has a floor mission.</li><li><b>Review daily.</b> Five old questions a day beats rereading.</li><li><b>Explain it back.</b> If you cannot say it simply, go round again.</li><li><b>Write it down.</b> One notebook for nameplates, faults and questions.</li></ol>'+
+   '<div class="btns"><a class="btn primary" style="text-decoration:none" href="#'+((L.find(l=>!S.done[l.id])||L[0]).id)+'">Go to today\'s lesson</a><a class="btn" style="text-decoration:none" href="#review">Daily review</a></div></section>'+
+   '<section class="card"><h2>The '+L.length+'-day path</h2><div class="mods">'+ORDER.map(stage).join("")+"</div></section>"+
+   '<section class="card"><h2>Floor missions</h2><p class="note">'+L.filter(l=>S.mis[l.id]).length+" of "+L.length+" done. Always with permission, and with a technician where a panel is involved.</p>"+
+   L.map((l,i)=>'<label class="check"><input type="checkbox" id="pm-'+l.id+'" data-k="mis:'+l.id+'"'+(S.mis[l.id]?" checked":"")+"><span><b>Day "+(i+1)+".</b> "+F[l.id]+"</span></label>").join("")+"</section>"+
+   '<section class="card"><h2>Growing after the course</h2><p class="note">A suggested path. Adjust it with your manager to fit your department.</p>'+
+   road.map((r,i)=>"<h3 style=\"font-size:20px;margin-top:6px\">"+r[0]+"</h3>"+r[1].map((t,k)=>'<label class="check"><input type="checkbox" id="rd-'+i+"-"+k+'" data-k="road:r'+i+"-"+k+'"'+(S.road["r"+i+"-"+k]?" checked":"")+"><span>"+t+"</span></label>").join("")).join("")+"</section>";
+}
+
+function review(){
+  const done=L.filter(l=>S.done[l.id]),src=done.length>=3?done:L;
+  const pool=src.flatMap(l=>l.quiz.map(q=>({q,l})));
+  for(let i=pool.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]];}
+  const set5=pool.slice(0,5),ans=[];
+  main.innerHTML='<section class="card"><span class="eyebrow">Retrieval practice</span><h2 class="lesson-title">Daily review</h2>'+
+   '<p class="oneline">Five questions drawn from '+(done.length>=3?"the lessons you have finished":"the whole course, until you have finished three lessons")+".</p>"+
+   '<div class="outs">'+out("rvS","Review streak")+out("rvD","Days reviewed")+'</div><div id="rv">'+
+   set5.map((x,qi)=>'<div class="q"><p>'+(qi+1)+". "+x.q.q+'</p><div class="opts">'+x.q.o.map((o,oi)=>'<button class="opt" data-q="'+qi+'" data-o="'+oi+'">'+o+"</button>").join("")+'</div><div class="why" id="rw'+qi+'"></div></div>').join("")+
+   '</div><div class="foot"><span class="note" id="rvM">Each correct answer is worth 5 XP.</span><button class="btn" id="rvN">New set</button></div></section>';
+  const stats=()=>{const n=streak();set("rvS",n+(n===1?" day":" days"));set("rvD",S.days.length);};stats();
+  $("#rvN").onclick=review;
+  main.querySelectorAll("#rv .opt").forEach(b=>b.onclick=()=>{const qi=+b.dataset.q,oi=+b.dataset.o,x=set5[qi];if(ans[qi]!=null)return;ans[qi]=oi===x.q.a;
+    main.querySelectorAll('#rv [data-q="'+qi+'"]').forEach(o=>{o.disabled=true;const k=+o.dataset.o;if(k===x.q.a)o.classList.add("right");else if(k===oi)o.classList.add("wrong");});
+    $("#rw"+qi).innerHTML=(ans[qi]?"Correct. ":"Not quite. ")+x.q.y+(ans[qi]?"":' <a href="#'+x.l.id+'">Reread: '+x.l.t+"</a>");
+    if(ans[qi])S.rx=(S.rx||0)+5;
+    if(set5.every((_,k)=>ans[k]!=null)){if(!S.days.includes(today()))S.days.push(today());set("rvM","Done for today: "+ans.filter(Boolean).length+" of "+set5.length+" correct. Come back tomorrow.");stats();}
+    save();meter();});
+}
+main.addEventListener("change",e=>{const c=e.target.closest("input[data-k]");if(!c)return;const p=c.dataset.k.split(":");S[p[0]][p[1]]=c.checked;save();meter();});
+
+
+const GLOSS=[
+["ACB","Air circuit breaker. The large breaker on the main low-voltage incomer."],
+["APFC","Automatic power factor correction. A panel that switches capacitor banks in and out."],
+["Busbar","A thick copper or aluminium bar that distributes power inside a panel."],
+["Contactor","A heavy-duty switch closed by an electromagnet coil. It switches motors on and off."],
+["CT","Current transformer. Steps a large current down to a small one for meters and protection relays."],
+["DG set","Diesel generator set. Backup power when the grid supply fails."],
+["DOL","Direct-on-line. The simplest motor starter: full voltage straight away."],
+["Earthing","Bonding metal bodies to earth so a fault trips the protection instead of shocking someone."],
+["ELCB / RCCB","Earth leakage or residual current breaker. Trips on a small leakage to earth to protect people."],
+["Ferrule","A numbered sleeve on a wire end. The number matches the drawing."],
+["FLC","Full load current. The current a motor draws at its rated load, shown on the nameplate."],
+["HMI","Human-machine interface. The operator's screen on a machine."],
+["HT / LT","High tension and low tension. HT is the kilovolt side, such as 11 kV or 33 kV. LT is the 415 V side."],
+["Interlock","A condition that must be true before an action is allowed, such as a guard closed before a press moves."],
+["IP rating","How well an enclosure keeps out dust and water, for example IP55."],
+["Isolator","A switch used to disconnect a circuit for safe working. It is the point where you fit your lock."],
+["kW, kVA, kVAr","Real power, apparent power and reactive power. See the power factor lesson."],
+["LOTO","Lockout-tagout. Isolate, lock, tag and test before working on a machine."],
+["MCB","Miniature circuit breaker. For small circuits, typically up to about 100 A."],
+["MCC","Motor control centre. A panel with a feeder and starter for each motor."],
+["MCCB","Moulded case circuit breaker. For larger feeders and motors."],
+["Megger","A common name for an insulation resistance tester. Used to check motor windings and cables."],
+["NO / NC","Normally open and normally closed. The state of a contact when nothing is energised or pressed."],
+["Overload relay","Sits under the contactor and trips it if the motor draws too much current for too long."],
+["PCC","Power control centre. The main low-voltage switchboard fed from the transformer."],
+["PLC","Programmable logic controller. The industrial computer that runs a machine's logic."],
+["PT / VT","Potential or voltage transformer. Steps high voltage down for metering and protection."],
+["RTD","Resistance temperature detector, such as a Pt100. Measures temperature by a change in resistance."],
+["SLD","Single line diagram. The power map of the plant."],
+["SMPS","Switch-mode power supply. The unit that makes 24 V DC for the control circuit."],
+["Slip","The small difference between the magnetic field speed and the rotor speed of an induction motor."],
+["Thermocouple","A temperature sensor made of two different metals that produce a small voltage when heated."],
+["VFD","Variable frequency drive. Controls motor speed by changing the supply frequency."]];
+function glossary(){
+  main.innerHTML='<section class="card"><span class="eyebrow">'+GLOSS.length+' terms</span><h2 class="lesson-title">Glossary</h2><p class="oneline">The abbreviations and words you will hear on the shop floor.</p>'+
+   '<div class="ctrl" style="max-width:420px"><label for="gq">Search</label><input type="search" id="gq" placeholder="Type a term, for example MCC" style="padding:10px;border-radius:8px;border:1px solid var(--line);background:var(--surface)"></div><div class="lab" style="max-width:520px"><b id="gT" style="font-family:var(--mono);font-size:22px"></b><p id="gD"></p><div class="btns"><button class="btn primary" id="gS">Show meaning</button><button class="btn" id="gN">Next term</button></div></div><dl class="gl" id="gl"></dl></section>';
+  let cur;const nx=()=>{cur=GLOSS[Math.floor(Math.random()*GLOSS.length)];set("gT",cur[0]);set("gD","Say the meaning to yourself, then check.");};$("#gS").onclick=()=>set("gD",cur[1]);$("#gN").onclick=nx;nx();
+  const draw=()=>{const q=$("#gq").value.trim().toLowerCase(),r=GLOSS.filter(g=>!q||(g[0]+" "+g[1]).toLowerCase().includes(q));
+    $("#gl").innerHTML=r.length?r.map(g=>"<div><dt>"+g[0]+"</dt><dd>"+g[1]+"</dd></div>").join(""):'<p class="note">No term matches. Try a shorter word.</p>';};
+  $("#gq").oninput=draw;draw();
+}
+
+let CUR="";
+function route(to){
+  cancelAnimationFrame(raf);
+  const id=(typeof to==="string"&&to)||(location.hash||"#start").slice(1),l=L.find(x=>x.id===id);
+  CUR=id;
+  if(l)lesson(l);else if(id==="plan")plan();else if(id==="review")review();else if(id==="glossary")glossary();else if(id==="formulas")formulas();else start();
+  nav(l?l.id:["plan","review","glossary","formulas"].includes(id)?id:"start");meter();
+  window.scrollTo(0,0);
+}
+/* Navigation does not rely on the browser following #links: some embedded viewers block that.
+   Every in-page link is handled here, and the address is updated only if the frame allows it. */
+function go(id){route(id);try{if(location.hash!=="#"+id)location.hash=id;}catch(_){}}
+document.addEventListener("click",e=>{const a=e.target.closest&&e.target.closest('a[href^="#"]');if(!a)return;e.preventDefault();go(a.getAttribute("href").slice(1));});
+window.addEventListener("hashchange",()=>{const id=(location.hash||"#start").slice(1);if(id!==CUR)route(id);});
+route();
+</script>
+</body>
+</html>
